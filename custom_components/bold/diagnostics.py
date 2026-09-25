@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.core import HomeAssistant
 
 from .coordinator import BoldConfigEntry, BoldRuntimeData
@@ -25,6 +25,26 @@ TO_REDACT = {
     "userExternalId",
     "webKey",
 }
+# Objects naming a person or organization, e.g. a device's owner. Their
+# "name" is redacted; other names, such as a device's, are kept.
+NAMED_PARTIES = {"owner", "user", "account", "triggeredBy", "organization"}
+
+
+def _redact(data: Any) -> Any:
+    """Redact secrets and personal details from Bold's API data."""
+    return _redact_party_names(async_redact_data(data, TO_REDACT))
+
+
+def _redact_party_names(data: Any) -> Any:
+    if isinstance(data, list):
+        return [_redact_party_names(item) for item in data]
+    if not isinstance(data, dict):
+        return data
+    redacted = {key: _redact_party_names(value) for key, value in data.items()}
+    for key in NAMED_PARTIES & redacted.keys():
+        if isinstance(party := redacted[key], dict) and party.get("name"):
+            redacted[key] = {**party, "name": REDACTED}
+    return redacted
 
 
 async def async_get_config_entry_diagnostics(
@@ -34,13 +54,9 @@ async def async_get_config_entry_diagnostics(
     data = entry.runtime_data
     return {
         "entry": async_redact_data(dict(entry.data), TO_REDACT),
-        "devices": async_redact_data(
-            [device.raw for device in data.devices.data.values()], TO_REDACT
-        ),
+        "devices": _redact([device.raw for device in data.devices.data.values()]),
         "event_log_devices": data.events.device_ids,
-        "recent_events": async_redact_data(
-            [event.raw for event in data.events.recent_events], TO_REDACT
-        ),
+        "recent_events": _redact([event.raw for event in data.events.recent_events]),
         "bluetooth": _bluetooth(data),
         "push": {
             "active": data.events.push_active,
