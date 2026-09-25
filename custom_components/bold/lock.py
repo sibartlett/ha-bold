@@ -32,6 +32,7 @@ from .boldsmartlock import (
     BoldDevice,
     BoldError,
     BoldEvent,
+    BoldEventType,
     BoldFirmwareOutdatedError,
     BoldGatewayNotFoundError,
     BoldRateLimitError,
@@ -346,16 +347,16 @@ class BoldLock(BoldEntity, LockEntity):
 
     def _apply_event(self, event: BoldEvent) -> bool:
         """Apply an event from the event log, returning whether it applied."""
-        if event.type == "DeviceLocked":
+        if event.type == BoldEventType.LOCKED:
             self._update_bolt(event.bolt_locked, event.time)
             return True
-        if event.type == "DeviceActivation" and event.result == "Success":
+        if event.type == BoldEventType.ACTIVATION and event.successful:
             until = event.time + (event.activation_time or self._activation_time)
             if event.keep_active_until:
                 until = max(until, event.keep_active_until)
             if self._active_until is None or until > self._active_until:
                 self._set_active(event.time, until)
-        elif event.type == "DeviceDeactivation":
+        elif event.type == BoldEventType.DEACTIVATION:
             if self._activated_at is None or event.time >= self._activated_at:
                 self._set_inactive(event.time)
         else:

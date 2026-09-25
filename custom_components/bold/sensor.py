@@ -185,49 +185,17 @@ class BoldBluetoothSignalSensor(BoldEntity, SensorEntity):
         return self._tracker.rssi(self.device_id)
 
 
-def _number(value: object) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        return None
-    return float(value)
-
-
-def _millivolts(value: object) -> float | None:
-    """Convert a voltage in millivolts, as Bold reports it, to volts.
-
-    Zero means the lock didn't measure it.
-    """
-    if (number := _number(value)) is None or number <= 0:
-        return None
-    return round(number / 1000, 3)
-
-
-def idle_voltage(event: BoldEvent) -> float | None:
-    """Return the battery voltage at rest, from a daily status or debug event."""
-    if event.type == "DeviceStatus":
-        return _millivolts(event.raw.get("voltageIdle"))
-    if event.type == "DeviceDebug" and isinstance(body := event.raw.get("body"), dict):
-        return _millivolts(body.get("voltageIdle"))
-    return None
-
-
 def voltage_under_load(event: BoldEvent) -> float | None:
     """Return the battery voltage under load, from the daily status.
 
     Debug events also sample the voltage while the motor runs, but those
     samples are lower than the lock's own measurement, so they aren't mixed in.
+    A status sent right after the lock started has nothing run under load
+    yet, so its voltage under load isn't one.
     """
-    if event.type == "DeviceStatus" and not _just_booted(event):
-        return _millivolts(event.raw.get("voltageUnderLoad"))
-    return None
-
-
-def _just_booted(event: BoldEvent) -> bool:
-    """Return whether a status was sent right after the lock started.
-
-    Nothing has run under load by then, so its voltage under load isn't one.
-    """
-    uptime = _number(event.raw.get("uptime"))
-    return uptime is not None and uptime < BOOT_STATUS_UPTIME
+    if event.uptime is not None and event.uptime < BOOT_STATUS_UPTIME:
+        return None
+    return event.voltage_under_load
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -246,7 +214,7 @@ REPORTED_SENSORS: tuple[BoldReportedSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
-        value_fn=idle_voltage,
+        value_fn=lambda event: event.voltage_idle,
     ),
     BoldReportedSensorDescription(
         key="battery_voltage_under_load",

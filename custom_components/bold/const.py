@@ -3,6 +3,8 @@
 from datetime import timedelta
 from typing import Final
 
+from .boldsmartlock import BoldEventType
+
 DOMAIN: Final = "bold"
 MANUFACTURER: Final = "Bold"
 
@@ -22,14 +24,14 @@ EVENT_CATCH_UP_LOOKBACK: Final = timedelta(hours=1)
 # While Bold pushes events to a webhook, polling is only a safety net.
 EVENT_PUSH_SCAN_INTERVAL: Final = timedelta(minutes=5)
 # The events the webhook is subscribed to.
-PUSHED_EVENT_TYPES: Final = [
-    "DeviceActivation",
-    "DeviceDeactivation",
-    "DeviceLocked",
-    "DeviceStatus",
-    "DeviceTamperFaultyPin",
-    "DeviceTamperRotations",
-    "DeviceTamperVibration",
+PUSHED_EVENT_TYPES: Final[list[str]] = [
+    BoldEventType.ACTIVATION,
+    BoldEventType.DEACTIVATION,
+    BoldEventType.LOCKED,
+    BoldEventType.STATUS,
+    BoldEventType.TAMPER_FAULTY_PIN,
+    BoldEventType.TAMPER_ROTATIONS,
+    BoldEventType.TAMPER_VIBRATION,
 ]
 
 # A Bold Connect is considered offline when Bold last heard from it this long

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 import re
 from typing import Any
 
@@ -85,6 +86,38 @@ def _person_name(person: Any) -> str | None:
         part for part in (person.get("firstName"), person.get("lastName")) if part
     )
     return name or person.get("emailAddress") or None
+
+
+class BoldEventType(StrEnum):
+    """Types of event in Bold's event log that the client interprets.
+
+    Bold has more; BoldEvent.type keeps whatever Bold sent.
+    """
+
+    ACTIVATION = "DeviceActivation"
+    DEACTIVATION = "DeviceDeactivation"
+    LOCKED = "DeviceLocked"
+    STATUS = "DeviceStatus"
+    DEBUG = "DeviceDebug"
+    TAMPER_FAULTY_PIN = "DeviceTamperFaultyPin"
+    TAMPER_ROTATIONS = "DeviceTamperRotations"
+    TAMPER_VIBRATION = "DeviceTamperVibration"
+
+
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value)
+
+
+def _millivolts(value: Any) -> float | None:
+    """Convert a voltage in millivolts, as Bold reports it, to volts.
+
+    Zero means the lock didn't measure it.
+    """
+    if (number := _number(value)) is None or number <= 0:
+        return None
+    return round(number / 1000, 3)
 
 
 # How Bold reports bolt positions: "LOCKED" on devices, "Locked" in events.
@@ -197,6 +230,12 @@ class BoldEvent:
     activation_time: timedelta | None
     keep_active_until: datetime | None
     bolt_locked: bool | None
+    # Battery voltages in volts, from status and debug events; None when not
+    # measured. Debug events only carry the voltage at rest.
+    voltage_idle: float | None
+    voltage_under_load: float | None
+    # Seconds since the lock started, from status and debug events.
+    uptime: float | None
     raw: dict[str, Any] = field(repr=False, compare=False)
 
     @classmethod
@@ -206,6 +245,14 @@ class BoldEvent:
         if not data.get("type") or time is None:
             return None
         event_id = data.get("id")
+        # Status events report at the top level, debug events in a body.
+        report: dict[str, Any] = {}
+        if data["type"] == BoldEventType.STATUS:
+            report = data
+        elif data["type"] == BoldEventType.DEBUG and isinstance(
+            body := data.get("body"), dict
+        ):
+            report = body
         return cls(
             id=event_id if isinstance(event_id, int) else None,
             type=data["type"],
@@ -225,9 +272,16 @@ class BoldEvent:
             keep_active_until=parse_datetime(data.get("keepActiveUntil")),
             bolt_locked=(
                 _BOLT_STATES.get(str(data.get("status")).upper())
-                if data["type"] == "DeviceLocked"
+                if data["type"] == BoldEventType.LOCKED
                 else None
             ),
+            voltage_idle=_millivolts(report.get("voltageIdle")),
+            voltage_under_load=(
+                _millivolts(report.get("voltageUnderLoad"))
+                if data["type"] == BoldEventType.STATUS
+                else None
+            ),
+            uptime=_number(report.get("uptime")),
             raw=data,
         )
 
@@ -240,6 +294,11 @@ class BoldEvent:
             self.time.replace(microsecond=0),
             self.bolt_locked,
         )
+
+    @property
+    def successful(self) -> bool:
+        """Return whether an activation succeeded."""
+        return self.result == "Success"
 
     @property
     def sort_key(self) -> tuple[datetime, int]:

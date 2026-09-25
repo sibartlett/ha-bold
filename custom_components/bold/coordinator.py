@@ -19,6 +19,7 @@ from .boldsmartlock import (
     BoldDevice,
     BoldError,
     BoldEvent,
+    BoldEventType,
     BoldForbiddenError,
 )
 from .const import (
@@ -142,7 +143,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
             return
         try:
             events = await self.client.get_events(
-                self.device_ids, since, ["DeviceStatus", "DeviceDebug"]
+                self.device_ids, since, [BoldEventType.STATUS, BoldEventType.DEBUG]
             )
         except BoldError as err:
             _LOGGER.debug("Couldn't fetch recent status events: %s", err)

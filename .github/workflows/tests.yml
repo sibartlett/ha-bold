@@ -16,6 +16,10 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy
+      - name: Check translations are generated from strings.json
+        run: |
+          python script/translations.py
+          git diff --exit-code custom_components/bold/translations
 
   tests:
     name: tests (Home Assistant ${{ matrix.name }})
@@ -35,4 +39,4 @@ jobs:
         with:
           python-version: "3.14"
       - run: pip install ${{ matrix.requirements }}
-      - run: pytest --cov=custom_components.bold --cov-report=term-missing --cov-fail-under=95
+      - run: pytest --cov=custom_components.bold --cov-report=term-missing --cov-fail-under=100

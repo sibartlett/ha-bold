@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .boldsmartlock import BoldDevice, BoldEvent
+from .boldsmartlock import BoldDevice, BoldEvent, BoldEventType
 from .coordinator import BoldConfigEntry, BoldEventCoordinator
 from .entity import async_add_device_entities, device_info
 
@@ -20,10 +20,10 @@ EVENT_TAMPER = "tamper"
 EVENT_LOCKED = "locked"
 EVENT_UNLOCKED = "unlocked"
 
-TAMPER_EVENTS = {
-    "DeviceTamperVibration": "vibration",
-    "DeviceTamperRotations": "rotations",
-    "DeviceTamperFaultyPin": "faulty_pin",
+TAMPER_EVENTS: dict[str, str] = {
+    BoldEventType.TAMPER_VIBRATION: "vibration",
+    BoldEventType.TAMPER_ROTATIONS: "rotations",
+    BoldEventType.TAMPER_FAULTY_PIN: "faulty_pin",
 }
 
 
@@ -47,13 +47,13 @@ async def async_setup_entry(
 
 def _event_type(event: BoldEvent) -> str | None:
     """Map a Bold event to an event entity type."""
-    if event.type == "DeviceActivation":
-        return EVENT_ACTIVATED if event.result == "Success" else EVENT_ACTIVATION_FAILED
-    if event.type == "DeviceDeactivation":
+    if event.type == BoldEventType.ACTIVATION:
+        return EVENT_ACTIVATED if event.successful else EVENT_ACTIVATION_FAILED
+    if event.type == BoldEventType.DEACTIVATION:
         return EVENT_DEACTIVATED
     if event.type in TAMPER_EVENTS:
         return EVENT_TAMPER
-    if event.type == "DeviceLocked" and event.bolt_locked is not None:
+    if event.type == BoldEventType.LOCKED and event.bolt_locked is not None:
         return EVENT_LOCKED if event.bolt_locked else EVENT_UNLOCKED
     return None
 
@@ -92,10 +92,10 @@ class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
                 "time": event.time.isoformat(),
                 "user": event.user_name,
             }
-            if event.type in ("DeviceActivation", "DeviceDeactivation"):
+            if event.type in (BoldEventType.ACTIVATION, BoldEventType.DEACTIVATION):
                 attributes["method"] = event.method
                 attributes["remote"] = event.remote_activation
-            if event.type == "DeviceActivation":
+            if event.type == BoldEventType.ACTIVATION:
                 attributes["result"] = event.result
             if event.type in TAMPER_EVENTS:
                 attributes["tamper_type"] = TAMPER_EVENTS[event.type]

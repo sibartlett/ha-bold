@@ -31,7 +31,13 @@ from .exceptions import (
     BoldGatewayNotFoundError,
     BoldRateLimitError,
 )
-from .models import BoldDevice, BoldEvent, parse_datetime, parse_duration
+from .models import (
+    BoldDevice,
+    BoldEvent,
+    BoldEventType,
+    parse_datetime,
+    parse_duration,
+)
 
 __all__ = [
     "API_URL",
@@ -52,6 +58,7 @@ __all__ = [
     "BoldDevice",
     "BoldError",
     "BoldEvent",
+    "BoldEventType",
     "BoldFirmwareOutdatedError",
     "BoldForbiddenError",
     "BoldGatewayNotFoundError",
