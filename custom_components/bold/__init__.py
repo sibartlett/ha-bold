@@ -30,6 +30,7 @@ PLATFORMS: list[Platform] = [
     Platform.EVENT,
     Platform.LOCK,
     Platform.SENSOR,
+    Platform.UPDATE,
 ]
 
 
@@ -92,11 +93,17 @@ def _async_sync_devices(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
     for device_entry in dr.async_entries_for_config_entry(
         device_registry, entry.entry_id
     ):
-        if (device_id := _bold_device_id(device_entry)) not in devices.data:
+        device_id = _bold_device_id(device_entry)
+        if (device := devices.data.get(device_id)) is None:
             devices.connect_device_ids.pop(device_id, None)
             device_registry.async_update_device(
                 device_entry.id, remove_config_entry_id=entry.entry_id
             )
+        elif device_entry.sw_version != (
+            sw_version := device_info(device).get("sw_version")
+        ):
+            # Firmware was updated, e.g. from the Bold app.
+            device_registry.async_update_device(device_entry.id, sw_version=sw_version)
 
 
 def _bold_device_id(device_entry: dr.DeviceEntry) -> int | None:

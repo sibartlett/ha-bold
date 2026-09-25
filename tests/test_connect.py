@@ -64,11 +64,15 @@ async def test_connect_device(
         == "2026-09-24T11:55:00+00:00"
     )
 
-    # Connects only get connectivity entities.
+    # Connects only get connectivity and firmware entities.
     assert sorted(
         entry.entity_id
         for entry in er.async_entries_for_device(entity_registry, connect.id)
-    ) == ["binary_sensor.bold_connect_connectivity", "sensor.bold_connect_last_seen"]
+    ) == [
+        "binary_sensor.bold_connect_connectivity",
+        "sensor.bold_connect_last_seen",
+        "update.bold_connect_firmware",
+    ]
 
 
 async def test_connect_offline(

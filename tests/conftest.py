@@ -143,7 +143,7 @@ def mock_api(
 @pytest.fixture
 def platforms() -> list[str]:
     """Platforms to set up; override in a test module to limit them."""
-    return ["binary_sensor", "event", "lock", "sensor"]
+    return ["binary_sensor", "event", "lock", "sensor", "update"]
 
 
 @pytest.fixture

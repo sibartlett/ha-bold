@@ -26,6 +26,12 @@ Each Bold Connect is a device too, and the locks it serves are linked to it:
 Locks without a Bold Connect show as unavailable, because they can't be
 activated remotely.
 
+Locks and Bold Connects also get a firmware update entity
+(`update.<name>_firmware`), which shows when a device is below the firmware
+version Bold requires. Bold only reports the required version, which may not be
+the newest release. Firmware is installed from the Bold app, so there's no
+install button.
+
 Locks and Bold Connects added to your Bold account appear automatically at the
 next device poll, and ones removed from it are removed from Home Assistant.
 
