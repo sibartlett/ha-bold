@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Any
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from .api import BoldError
+from .exceptions import BoldError
 
 if TYPE_CHECKING:
     from bleak.backends.device import BLEDevice

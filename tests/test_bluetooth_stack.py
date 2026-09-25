@@ -13,7 +13,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.bluetooth import BluetoothServiceInfo
 import pytest
 
-from custom_components.bold.boldsmartlock.api import BoldClient
+from custom_components.bold.boldsmartlock import BoldClient
 from custom_components.bold.boldsmartlock.ble import (
     PACKET_CLIENT_BLOCKED,
     PACKET_COMMAND_ACK,

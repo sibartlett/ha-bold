@@ -3,21 +3,6 @@
 Kept free of Home Assistant imports, so it can become a standalone library.
 """
 
-from .api import (
-    BoldAuthError,
-    BoldClient,
-    BoldCommandError,
-    BoldConnectionError,
-    BoldDevice,
-    BoldError,
-    BoldEvent,
-    BoldFirmwareOutdatedError,
-    BoldForbiddenError,
-    BoldGatewayNotFoundError,
-    BoldRateLimitError,
-    parse_datetime,
-    parse_duration,
-)
 from .ble import (
     MANUFACTURER_ID,
     SERVICE_UUID,
@@ -27,6 +12,7 @@ from .ble import (
     async_send_command,
     parse_advertisement,
 )
+from .client import BoldClient
 from .const import (
     API_URL,
     COMMAND_ACTIVATE,
@@ -35,6 +21,17 @@ from .const import (
     OAUTH2_TOKEN,
     WEBHOOK_SECRET_HEADER,
 )
+from .exceptions import (
+    BoldAuthError,
+    BoldCommandError,
+    BoldConnectionError,
+    BoldError,
+    BoldFirmwareOutdatedError,
+    BoldForbiddenError,
+    BoldGatewayNotFoundError,
+    BoldRateLimitError,
+)
+from .models import BoldDevice, BoldEvent, parse_datetime, parse_duration
 
 __all__ = [
     "API_URL",

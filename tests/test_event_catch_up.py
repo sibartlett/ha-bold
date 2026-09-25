@@ -19,7 +19,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
 
-from custom_components.bold.boldsmartlock.api import BoldEvent, parse_datetime
+from custom_components.bold.boldsmartlock import BoldEvent, parse_datetime
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import EVENT_SCAN_INTERVAL
 
@@ -92,7 +92,7 @@ async def event_log(
     with (
         patch("custom_components.bold.PLATFORMS", platforms),
         patch(
-            "custom_components.bold.boldsmartlock.api.BoldClient.get_events",
+            "custom_components.bold.boldsmartlock.client.BoldClient.get_events",
             autospec=True,
             side_effect=log.get_events,
         ),
