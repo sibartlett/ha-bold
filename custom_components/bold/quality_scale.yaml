@@ -82,8 +82,10 @@ rules:
       The only configuration is the Bold account, whose credentials are
       renewed with the reauthentication flow.
   repair-issues:
-    status: todo
-    comment: A Bold Connect going offline could be raised as a repair issue.
+    status: done
+    comment: |
+      A Bold Connect offline for an hour, a lock only reachable over Bluetooth
+      that's out of range for an hour, and a lock with no way to reach it.
   stale-devices: done
 
   # Platinum

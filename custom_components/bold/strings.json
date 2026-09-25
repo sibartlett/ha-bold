@@ -129,5 +129,19 @@
     "update_failed": {
       "message": "Error communicating with the Bold API: {error}"
     }
+  },
+  "issues": {
+    "connect_offline": {
+      "title": "Bold Connect {name} is offline",
+      "description": "Bold hasn't heard from the Bold Connect **{name}** since {last_seen}, so {locks} can't be unlocked through it.\n\nCheck that the Bold Connect is powered and connected to Wi-Fi; unplugging it for a few seconds usually helps. Locks in Bluetooth range of Home Assistant can still be unlocked over Bluetooth."
+    },
+    "lock_out_of_range": {
+      "title": "{name} is out of Bluetooth range",
+      "description": "**{name}** can only be unlocked over Bluetooth, because it has no Bold Connect or its unlock method is Bluetooth only, but Home Assistant hasn't heard it since {since}.\n\nAdd an ESPHome Bluetooth proxy near the lock, or check that the one near it is working. If the lock is only in range some of the time, you can ignore this; you'll only be told again if it goes out of range again after being heard."
+    },
+    "lock_no_route": {
+      "title": "{name} can't be unlocked from Home Assistant",
+      "description": "**{name}** has no Bold Connect, and Home Assistant has no Bluetooth to reach it directly.\n\nAdd a Bold Connect to the lock in the Bold app, or give Home Assistant Bluetooth, for example with an ESPHome Bluetooth proxy near the lock."
+    }
   }
 }

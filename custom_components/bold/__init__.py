@@ -27,6 +27,7 @@ from .coordinator import (
     BoldRuntimeData,
 )
 from .entity import device_info
+from .issues import async_check_issues, async_delete_issues
 from .keys import BoldBluetoothKeys
 from .tracker import BoldBluetoothTracker
 from .unlock import BoldUnlockMethods
@@ -113,8 +114,9 @@ def _async_setup_bluetooth(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
-    """Delete the stored Bluetooth keys when Bold is removed."""
+    """Delete the stored Bluetooth keys and issues when Bold is removed."""
     await BoldBluetoothKeys.async_remove_stored(hass, entry.entry_id)
+    async_delete_issues(hass)
 
 
 @callback
@@ -153,6 +155,8 @@ def _async_sync_devices(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
         ):
             # Firmware was updated, e.g. from the Bold app.
             device_registry.async_update_device(device_entry.id, sw_version=sw_version)
+
+    async_check_issues(hass, entry)
 
 
 def _bold_device_id(device_entry: dr.DeviceEntry) -> int | None:

@@ -39,5 +39,9 @@ BLUETOOTH_FALLBACK_TIMEOUT: Final = 15
 BLUETOOTH_MIN_RSSI: Final = -85
 BLUETOOTH_TIMEOUT: Final = 30
 
+# Repair issues are only raised once a problem has lasted this long.
+ISSUE_AFTER: Final = timedelta(hours=1)
+TROUBLESHOOTING_URL: Final = "https://github.com/sibartlett/ha-bold#troubleshooting"
+
 # Used when Bold does not tell us how long an activation lasts.
 DEFAULT_ACTIVATION_TIME: Final = timedelta(seconds=5)

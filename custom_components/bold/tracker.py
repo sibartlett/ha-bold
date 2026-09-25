@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.service_info.bluetooth import BluetoothServiceInfo
+from homeassistant.util import dt as dt_util
 
 from .ble import MANUFACTURER_ID, parse_advertisement
 
@@ -30,6 +32,8 @@ class BoldBluetoothTracker:
         self._addresses: dict[int, str] = {}
         self._reachable: set[int] = set()
         self._rssi: dict[int, int] = {}
+        self._last_seen: dict[int, datetime] = {}
+        self._started = dt_util.utcnow()
         self._listeners: dict[int, list[CALLBACK_TYPE]] = {}
         self._unsubscribes: list[Callable[[], None]] = []
 
@@ -76,6 +80,7 @@ class BoldBluetoothTracker:
             return
         device_id = advertisement.device_id
         self._rssi[device_id] = info.rssi
+        self._last_seen[device_id] = dt_util.utcnow()
         if self._addresses.get(device_id) != info.address:
             _LOGGER.debug("Bold device %s is at %s", device_id, info.address)
             self._addresses[device_id] = info.address
@@ -115,6 +120,15 @@ class BoldBluetoothTracker:
         if device_id not in self._reachable:
             return False
         return min_rssi is None or self._rssi.get(device_id, min_rssi) >= min_rssi
+
+    def unreachable_since(self, device_id: int) -> datetime | None:
+        """Return since when a device hasn't been heard, if it isn't reachable.
+
+        A device not heard since Home Assistant started counts from then.
+        """
+        if device_id in self._reachable:
+            return None
+        return self._last_seen.get(device_id, self._started)
 
     def rssi(self, device_id: int) -> int | None:
         """Return how well a reachable device was last heard, in dBm."""

@@ -196,6 +196,13 @@ actions:
 
 ## Troubleshooting
 
+Home Assistant raises a repair (**Settings → System → Repairs**) when a Bold
+Connect has been offline for an hour, when a lock that can only be unlocked
+over Bluetooth has been out of range for an hour, or when a lock has no way to
+be unlocked from Home Assistant at all. Repairs clear themselves once the
+problem is gone. You can ignore one, e.g. for a lock that's only in range some
+of the time; it's raised again if the problem comes back after being fixed.
+
 - **A lock is unavailable.** It has no Bold Connect assigned in the Bold app, or
   the integration can't reach Bold. Check the lock's Bold Connect signal, and
   that the Connect is online.
