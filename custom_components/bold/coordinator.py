@@ -21,7 +21,14 @@ from .api import (
     BoldEvent,
     BoldForbiddenError,
 )
-from .const import DEVICE_SCAN_INTERVAL, DOMAIN, EVENT_POLL_OVERLAP, EVENT_SCAN_INTERVAL
+from .const import (
+    DEVICE_SCAN_INTERVAL,
+    DOMAIN,
+    EVENT_CATCH_UP_INTERVAL,
+    EVENT_CATCH_UP_LOOKBACK,
+    EVENT_POLL_OVERLAP,
+    EVENT_SCAN_INTERVAL,
+)
 from .keys import BoldBluetoothKeys
 from .tracker import BoldBluetoothTracker
 from .unlock import BoldUnlockMethods
@@ -90,6 +97,10 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
     oldest first. A device's first poll only records which of its events
     already exist, so history is not replayed when Home Assistant starts or
     a lock is added. The device list is kept up to date by the integration.
+
+    Polls look back a couple of minutes. Locks upload events when something
+    next syncs with them, so every so often a catch-up poll looks back an hour
+    to pick up events that arrived late.
     """
 
     config_entry: BoldConfigEntry
@@ -118,6 +129,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         self._cursor: datetime | None = None
         self._seen: dict[int, datetime] = {}
         self._primed: set[int] = set()
+        self._last_catch_up: datetime | None = None
 
     async def async_load_status_history(self, since: datetime) -> None:
         """Fetch recent status and debug events, e.g. for battery voltages."""
@@ -134,14 +146,23 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
 
     async def _async_update_data(self) -> list[BoldEvent]:
         """Fetch events since the last poll."""
-        cursor = self._cursor or dt_util.utcnow()
+        now = dt_util.utcnow()
+        cursor = self._cursor or now
         if not (device_ids := list(self.device_ids)):
             self._cursor = cursor
             return []
+        # Catch up periodically, and when priming devices, so the hour they
+        # record as already seen is the hour catch-ups look back over.
+        catch_up = (
+            self._last_catch_up is None
+            or now - self._last_catch_up >= EVENT_CATCH_UP_INTERVAL
+            or not self._primed.issuperset(device_ids)
+        )
+        since = cursor - EVENT_POLL_OVERLAP
+        if catch_up:
+            since = min(since, now - EVENT_CATCH_UP_LOOKBACK)
         try:
-            events = await self.client.get_events(
-                device_ids, cursor - EVENT_POLL_OVERLAP
-            )
+            events = await self.client.get_events(device_ids, since)
         except BoldAuthError as err:
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN, translation_key="auth_failed"
@@ -169,9 +190,14 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
             self.recent_events.append(event)
             cursor = max(cursor, event.time)
 
-        # Events older than the overlap window can't be returned again.
         self._cursor = cursor
-        horizon = cursor - 2 * EVENT_POLL_OVERLAP
+        if catch_up:
+            self._last_catch_up = now
+        # Forget events older than any poll can return again.
+        horizon = (
+            min(cursor - EVENT_POLL_OVERLAP, now - EVENT_CATCH_UP_LOOKBACK)
+            - EVENT_POLL_OVERLAP
+        )
         self._seen = {
             event_id: time for event_id, time in self._seen.items() if time >= horizon
         }

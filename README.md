@@ -88,7 +88,10 @@ Bold only offers push updates (webhooks) to business organizations, so the
 integration polls Bold's cloud:
 
 - **Activity** (the event log) every 30 seconds. Activations, changes to
-  `changed_by` and activity events show up within about 30 seconds.
+  `changed_by` and activity events show up within about 30 seconds of reaching
+  Bold. Locks upload their events when a Bold Connect or phone next syncs with
+  them, which can be later, so every 10 minutes a poll looks back an hour to
+  pick up events that arrived late, such as battery voltage readings.
 - **Devices** (battery, signal, firmware, Bold Connect status) every 10 minutes.
 
 Unlocking from Home Assistant updates the lock straight away.

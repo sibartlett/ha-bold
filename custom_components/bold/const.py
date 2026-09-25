@@ -16,6 +16,11 @@ EVENT_SCAN_INTERVAL: Final = timedelta(seconds=30)
 # How far back the event poll looks, to tolerate clock skew and events that
 # arrive at the API late. Events are de-duplicated by ID.
 EVENT_POLL_OVERLAP: Final = timedelta(minutes=2)
+# Locks upload their events when a Bold Connect or phone next syncs with them,
+# which can be minutes later. Every so often, a poll looks further back to
+# catch those.
+EVENT_CATCH_UP_INTERVAL: Final = timedelta(minutes=10)
+EVENT_CATCH_UP_LOOKBACK: Final = timedelta(hours=1)
 
 # A Bold Connect is considered offline when Bold last heard from it this long
 # ago. It checks in every few minutes, and devices are polled every 10.
