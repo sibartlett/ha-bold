@@ -59,8 +59,8 @@ Each lock gets:
 
 | Entity | What it does |
 |---|---|
-| `lock.<lock>` | **Unlock** activates the lock through your Bold Connect. The lock shows as unlocked while it is activated, and locked otherwise. **Lock** ends an activation early. `changed_by` shows who last activated or deactivated it. |
-| `event.<lock>_activity` | Fires for activations (with the user and method: PIN, button, app…), failed activations such as a wrong PIN, deactivations, and tamper alerts. |
+| `lock.<lock>` | **Unlock** activates the lock. Locks that report their bolt position (upgraded locks, with locked status turned on in the Bold app) show it: locked or unlocked, and unlocking while activated and waiting to be turned. Other locks show as unlocked while activated and locked otherwise, as an assumed state. **Lock** ends an activation early. `changed_by` shows who last activated or deactivated it. |
+| `event.<lock>_activity` | Fires for activations (with the user and method: PIN, button, app…), failed activations such as a wrong PIN, deactivations, tamper alerts, and, for locks that report their bolt position, the bolt being locked or unlocked. |
 | `sensor.<lock>_battery_level` | Battery level as Bold reports it: Excellent, High, Medium, Low or Critical. |
 | `binary_sensor.<lock>_battery` | Low battery: on when the level is Low or Critical. |
 | `sensor.<lock>_battery_voltage` | Battery voltage at rest, from the lock's daily status report (and occasional extra readings). |
@@ -175,9 +175,9 @@ actions:
 
 ## Known limitations
 
-- **No bolt position.** The lock's state shows whether it is _activated_, not
-  whether the door is actually open: it's marked as an assumed state. Locks
-  that report their bolt position aren't supported yet.
+- **Bolt position needs an upgraded lock.** Other locks' state shows whether
+  they're _activated_, not whether the bolt is thrown, as an assumed state.
+  Bolt changes appear within about 30 seconds.
 - **Lock can't throw the bolt.** Bold locks are turned by hand; **Lock** only
   ends an activation early.
 - **Delays.** Activity from outside Home Assistant (app, PIN, button, key fob)

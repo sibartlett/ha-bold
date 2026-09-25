@@ -1,8 +1,11 @@
 """Lock platform for the Bold integration.
 
 A Bold lock is not motorised: activating it lets someone turn the cylinder by
-hand for a short time. Without bolt position reporting, the lock is shown as
-unlocked while it is activated and locked otherwise, as an assumed state.
+hand for a short time.
+
+Upgraded locks report their bolt position: the lock shows that, and shows as
+unlocking while it's activated with the bolt still thrown. Other locks show as
+unlocked while activated and locked otherwise, as an assumed state.
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ from typing import Any
 
 from homeassistant.components.lock import LockEntity
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.util import dt as dt_util
@@ -94,7 +97,6 @@ class BoldLock(BoldEntity, LockEntity):
     """A Bold Smart Lock."""
 
     _attr_name = None
-    _attr_assumed_state = True
 
     def __init__(self, data: BoldRuntimeData, device: BoldDevice) -> None:
         """Initialize the lock."""
@@ -106,6 +108,8 @@ class BoldLock(BoldEntity, LockEntity):
         self._activated_at: datetime | None = None
         self._active_until: datetime | None = None
         self._unsub_expiry: CALLBACK_TYPE | None = None
+        self._bolt_locked: bool | None = None
+        self._bolt_changed: datetime | None = None
         self._update_from_device()
 
     async def async_added_to_hass(self) -> None:
@@ -168,9 +172,28 @@ class BoldLock(BoldEntity, LockEntity):
         )
 
     @property
+    def _reports_bolt(self) -> bool:
+        """Return whether the lock's bolt position is known."""
+        return self.device.reports_bolt and self._bolt_locked is not None
+
+    @property
+    def assumed_state(self) -> bool:
+        """Return whether the state is assumed, without a bolt position."""
+        return not self._reports_bolt
+
+    @property
     def is_locked(self) -> bool:
-        """Return whether the lock is not activated."""
+        """Return whether the bolt is thrown, or else the lock isn't activated."""
+        if self._reports_bolt:
+            return bool(self._bolt_locked)
         return not self._is_active
+
+    @property
+    def is_unlocking(self) -> bool:
+        """Return whether the lock is being activated, or ready to be turned."""
+        return bool(self._attr_is_unlocking) or (
+            self._reports_bolt and bool(self._bolt_locked) and self._is_active
+        )
 
     @property
     def _is_active(self) -> bool:
@@ -190,6 +213,12 @@ class BoldLock(BoldEntity, LockEntity):
     async def async_lock(self, **kwargs: Any) -> None:
         """End an activation early. Bold locks can't throw the bolt themselves."""
         if not self._is_active:
+            if self._reports_bolt and not self._bolt_locked:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="bolt_open",
+                    translation_placeholders={"name": self.device.name},
+                )
             return
         await self._async_send_showing_progress(COMMAND_DEACTIVATE)
         self._set_inactive(dt_util.utcnow())
@@ -294,6 +323,7 @@ class BoldLock(BoldEntity, LockEntity):
         """Pick up activations reported by the device, e.g. keep-active."""
         if self.device_id not in self.coordinator.data:
             return
+        self._update_bolt(self.device.bolt_locked, self.device.bolt_changed)
         until = self.device.is_active_until
         now = dt_util.utcnow()
         if (
@@ -319,6 +349,10 @@ class BoldLock(BoldEntity, LockEntity):
             elif event.type == "DeviceDeactivation":
                 if self._activated_at is None or event.time >= self._activated_at:
                     self._set_inactive(event.time)
+            elif event.type == "DeviceLocked":
+                self._update_bolt(event.bolt_locked, event.time)
+                changed = True
+                continue
             else:
                 continue
             changed = True
@@ -326,6 +360,19 @@ class BoldLock(BoldEntity, LockEntity):
                 self._attr_changed_by = event.user_name
         if changed:
             self.async_write_ha_state()
+
+    def _update_bolt(self, locked: bool | None, changed: datetime | None) -> None:
+        """Take a bolt position, unless an already known one is newer."""
+        if locked is None:
+            return
+        if (
+            changed is not None
+            and self._bolt_changed is not None
+            and changed < self._bolt_changed
+        ):
+            return
+        self._bolt_locked = locked
+        self._bolt_changed = changed or self._bolt_changed
 
     def _set_active(self, start: datetime, until: datetime) -> None:
         self._activated_at = start

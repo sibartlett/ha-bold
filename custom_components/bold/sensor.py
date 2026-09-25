@@ -35,6 +35,9 @@ PARALLEL_UPDATES = 0
 # rather than on each advertisement, which can be several times a second.
 SCAN_INTERVAL = timedelta(seconds=30)
 
+# Status reports this many seconds after a lock started are from its boot.
+BOOT_STATUS_UPTIME = 60
+
 # Bold reports battery and signal levels as words, on the same scale.
 LEVELS = ["excellent", "high", "medium", "low", "critical"]
 
@@ -213,9 +216,18 @@ def voltage_under_load(event: BoldEvent) -> float | None:
     Debug events also sample the voltage while the motor runs, but those
     samples are lower than the lock's own measurement, so they aren't mixed in.
     """
-    if event.type == "DeviceStatus":
+    if event.type == "DeviceStatus" and not _just_booted(event):
         return _millivolts(event.raw.get("voltageUnderLoad"))
     return None
+
+
+def _just_booted(event: BoldEvent) -> bool:
+    """Return whether a status was sent right after the lock started.
+
+    Nothing has run under load by then, so its voltage under load isn't one.
+    """
+    uptime = _number(event.raw.get("uptime"))
+    return uptime is not None and uptime < BOOT_STATUS_UPTIME
 
 
 @dataclass(frozen=True, kw_only=True)

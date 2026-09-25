@@ -43,7 +43,9 @@
               "activated": "Activated",
               "activation_failed": "Activation failed",
               "deactivated": "Deactivated",
-              "tamper": "Tamper alert"
+              "locked": "Locked",
+              "tamper": "Tamper alert",
+              "unlocked": "Unlocked"
             }
           }
         }
@@ -107,6 +109,9 @@
     },
     "bluetooth_unavailable": {
       "message": "The lock can't be reached over Bluetooth."
+    },
+    "bolt_open": {
+      "message": "{name} can't lock itself: turn the knob to lock it."
     },
     "command_failed": {
       "message": "The Bold lock command failed: {error}"

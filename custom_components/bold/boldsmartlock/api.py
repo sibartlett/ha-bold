@@ -136,6 +136,10 @@ def _person_name(person: Any) -> str | None:
     return name or person.get("emailAddress") or None
 
 
+# How Bold reports bolt positions: "LOCKED" on devices, "Locked" in events.
+_BOLT_STATES = {"LOCKED": True, "UNLOCKED": False}
+
+
 @dataclass(frozen=True)
 class BoldDevice:
     """A Bold device, from GET /v2/devices."""
@@ -151,6 +155,11 @@ class BoldDevice:
     battery_last_measurement: datetime | None
     activation_time: timedelta | None
     is_active_until: datetime | None
+    # Whether the lock reports its bolt position (an upgraded lock, with it
+    # turned on), whether the bolt is thrown, and when that last changed.
+    reports_bolt: bool
+    bolt_locked: bool | None
+    bolt_changed: datetime | None
     remote_access: bool
     event_log: bool
     gateway_id: int | None
@@ -181,6 +190,10 @@ class BoldDevice:
             battery_last_measurement=parse_datetime(data.get("batteryLastMeasurement")),
             activation_time=parse_duration(settings.get("activationTime")),
             is_active_until=parse_datetime(data.get("isActiveUntil")),
+            reports_bolt=bool(features.get("lockedStatus"))
+            and bool(settings.get("lockedStatus")),
+            bolt_locked=_BOLT_STATES.get(str(data.get("locked")).upper()),
+            bolt_changed=parse_datetime(data.get("lastLocked")),
             remote_access=bool(features.get("remoteAccess")),
             event_log=bool(features.get("eventLog")),
             gateway_id=gateway.get("id"),
@@ -229,6 +242,7 @@ class BoldEvent:
     remote_activation: bool
     activation_time: timedelta | None
     keep_active_until: datetime | None
+    bolt_locked: bool | None
     raw: dict[str, Any] = field(repr=False, compare=False)
 
     @classmethod
@@ -254,6 +268,11 @@ class BoldEvent:
             remote_activation=bool(data.get("remoteActivation") or data.get("connect")),
             activation_time=parse_duration(data.get("activationTime")),
             keep_active_until=parse_datetime(data.get("keepActiveUntil")),
+            bolt_locked=(
+                _BOLT_STATES.get(str(data.get("status")).upper())
+                if data["type"] == "DeviceLocked"
+                else None
+            ),
             raw=data,
         )
 

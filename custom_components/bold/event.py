@@ -17,6 +17,8 @@ EVENT_ACTIVATED = "activated"
 EVENT_ACTIVATION_FAILED = "activation_failed"
 EVENT_DEACTIVATED = "deactivated"
 EVENT_TAMPER = "tamper"
+EVENT_LOCKED = "locked"
+EVENT_UNLOCKED = "unlocked"
 
 TAMPER_EVENTS = {
     "DeviceTamperVibration": "vibration",
@@ -51,6 +53,8 @@ def _event_type(event: BoldEvent) -> str | None:
         return EVENT_DEACTIVATED
     if event.type in TAMPER_EVENTS:
         return EVENT_TAMPER
+    if event.type == "DeviceLocked" and event.bolt_locked is not None:
+        return EVENT_LOCKED if event.bolt_locked else EVENT_UNLOCKED
     return None
 
 
@@ -64,6 +68,8 @@ class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
         EVENT_ACTIVATION_FAILED,
         EVENT_DEACTIVATED,
         EVENT_TAMPER,
+        EVENT_LOCKED,
+        EVENT_UNLOCKED,
     ]
 
     def __init__(self, coordinator: BoldEventCoordinator, device: BoldDevice) -> None:

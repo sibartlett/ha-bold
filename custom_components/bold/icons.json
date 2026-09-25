@@ -9,7 +9,9 @@
               "activated": "mdi:lock-open-variant",
               "activation_failed": "mdi:lock-alert",
               "deactivated": "mdi:lock",
-              "tamper": "mdi:alarm-light"
+              "tamper": "mdi:alarm-light",
+              "locked": "mdi:lock-check",
+              "unlocked": "mdi:lock-open"
             }
           }
         }

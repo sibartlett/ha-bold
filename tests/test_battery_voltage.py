@@ -257,3 +257,24 @@ async def test_voltage_history_unavailable(
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     assert hass.states.get(IDLE).state == STATE_UNKNOWN
+
+
+async def test_boot_status_ignored_for_load(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test a status sent right after a (re)boot isn't used for under load.
+
+    Like the one a lock sends after a firmware update: nothing has run under
+    load yet, so it reports its voltage at rest for both.
+    """
+    set_events(mock_api, [_status(21, "2026-09-24T12:00:05Z", 3061, 2945, 18)])
+    await _poll(hass, frozen_time)
+    boot = _status(22, "2026-09-24T12:00:30Z", 3054, 3054, 21)
+    boot["uptime"] = 1
+    set_events(mock_api, [boot])
+    await _poll(hass, frozen_time)
+    assert hass.states.get(IDLE).state == "3.054"
+    assert hass.states.get(UNDER_LOAD).state == "2.945"
