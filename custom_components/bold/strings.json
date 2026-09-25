@@ -1,6 +1,10 @@
 {
   "config": {
     "step": {
+      "discovery_confirm": {
+        "title": "Bold device found",
+        "description": "A Bold device was found. Do you want to set up Bold? You'll sign in with your Bold account next."
+      },
       "pick_implementation": {
         "title": "[%key:common::config_flow::title::oauth2_pick_implementation%]"
       },

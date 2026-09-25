@@ -55,8 +55,10 @@ rules:
   devices: done
   diagnostics: done
   discovery:
-    status: todo
-    comment: Bold devices advertise over Bluetooth, so they could be discovered.
+    status: done
+    comment: |
+      Bold devices are discovered over Bluetooth, and the Bold Connect by its
+      DHCP hostname. Discovery only offers to set up Bold, once.
   discovery-update-info:
     status: exempt
     comment: Bold is a cloud service; there is no network address to update.

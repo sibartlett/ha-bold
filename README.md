@@ -41,6 +41,10 @@ Signing in needs one of:
 
 There are no other settings. Each Bold account can be added once.
 
+If Home Assistant can hear a Bold lock over Bluetooth, or sees a Bold Connect
+join your network, it offers to set up Bold under
+**Settings → Devices & services → Discovered**.
+
 ## Entities
 
 A Bold lock is not motorised: unlocking it _activates_ the cylinder, so it can
