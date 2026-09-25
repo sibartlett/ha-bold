@@ -4,7 +4,7 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "PL"]
@@ -23,5 +23,4 @@ combine-as-imports = true
 python_version = "3.14"
 strict = true
 explicit_package_bases = true
-ignore_missing_imports = true
 files = ["custom_components/bold"]

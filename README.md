@@ -266,12 +266,14 @@ so it can become a standalone library (as Home Assistant core requires). A test
 keeps it that way.
 
 ```sh
-pip install -r requirements_test.txt ruff mypy
+pip install -r requirements_test.txt pre-commit
+pre-commit install  # runs ruff and mypy before each commit
 pytest --cov=custom_components.bold
-ruff check . && ruff format --check .
-mypy
 python script/translations.py  # after changing strings.json
 ```
+
+CI also runs the tests against the oldest Home Assistant version in
+`hacs.json`.
 
 ## Security
 

@@ -139,7 +139,7 @@ class BoldBluetoothKeys:
                         for command_type, command in keys["commands"].items()
                     },
                 )
-            except (KeyError, TypeError, ValueError, binascii.Error):
+            except KeyError, TypeError, ValueError, binascii.Error:
                 _LOGGER.debug("Ignoring invalid stored keys for %s", device_id)
 
     async def async_refresh(self, device_ids: list[int]) -> None:
