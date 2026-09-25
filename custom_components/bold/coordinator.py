@@ -8,7 +8,7 @@ from datetime import datetime
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -27,7 +27,9 @@ from .const import (
     EVENT_CATCH_UP_INTERVAL,
     EVENT_CATCH_UP_LOOKBACK,
     EVENT_POLL_OVERLAP,
+    EVENT_PUSH_SCAN_INTERVAL,
     EVENT_SCAN_INTERVAL,
+    PUSHED_EVENT_TYPES,
 )
 from .keys import BoldBluetoothKeys
 from .tracker import BoldBluetoothTracker
@@ -130,6 +132,8 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         self._seen: dict[int, datetime] = {}
         self._primed: set[int] = set()
         self._last_catch_up: datetime | None = None
+        self.push_active = False
+        self.last_push: datetime | None = None
 
     async def async_load_status_history(self, since: datetime) -> None:
         """Fetch recent status and debug events, e.g. for battery voltages."""
@@ -181,6 +185,28 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
                 translation_placeholders={"error": str(err)},
             ) from err
 
+        new_events = self._accept(events, now)
+        if catch_up:
+            self._last_catch_up = now
+        primed, self._primed = self._primed, set(device_ids)
+        delivered = [event for event in new_events if event.device_id in primed]
+
+        # A poll finding an event the webhook should have pushed means pushes
+        # stopped working: poll often again until the next one arrives.
+        if self.push_active and any(
+            event.type in PUSHED_EVENT_TYPES for event in delivered
+        ):
+            _LOGGER.info(
+                "Bold's webhook missed an event; polling every %s until it "
+                "delivers again",
+                EVENT_SCAN_INTERVAL,
+            )
+            self.async_set_push_active(False)
+        return delivered
+
+    def _accept(self, events: list[BoldEvent], now: datetime) -> list[BoldEvent]:
+        """Record events, returning those not seen before, oldest first."""
+        cursor = self._cursor or now
         new_events = sorted(
             (event for event in events if event.id not in self._seen),
             key=lambda event: (event.time, event.id),
@@ -189,10 +215,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
             self._seen[event.id] = event.time
             self.recent_events.append(event)
             cursor = max(cursor, event.time)
-
         self._cursor = cursor
-        if catch_up:
-            self._last_catch_up = now
         # Forget events older than any poll can return again.
         horizon = (
             min(cursor - EVENT_POLL_OVERLAP, now - EVENT_CATCH_UP_LOOKBACK)
@@ -201,6 +224,26 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         self._seen = {
             event_id: time for event_id, time in self._seen.items() if time >= horizon
         }
+        return new_events
 
-        primed, self._primed = self._primed, set(device_ids)
-        return [event for event in new_events if event.device_id in primed]
+    @callback
+    def async_handle_push(self, events: list[BoldEvent]) -> None:
+        """Handle events Bold pushed to the webhook."""
+        self.last_push = dt_util.utcnow()
+        if not self.push_active:
+            _LOGGER.info("Bold's webhook is delivering events again")
+            self.async_set_push_active(True)
+        if new_events := [
+            event
+            for event in self._accept(events, self.last_push)
+            if event.device_id in self._primed
+        ]:
+            self.async_set_updated_data(new_events)
+
+    @callback
+    def async_set_push_active(self, active: bool) -> None:
+        """Poll less often while Bold pushes events to the webhook."""
+        self.push_active = active
+        self.update_interval = (
+            EVENT_PUSH_SCAN_INTERVAL if active else EVENT_SCAN_INTERVAL
+        )

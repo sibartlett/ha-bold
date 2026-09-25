@@ -10,6 +10,9 @@ from homeassistant.core import HomeAssistant
 from .coordinator import BoldConfigEntry, BoldRuntimeData
 
 TO_REDACT = {
+    "webhook_id",
+    "webhook_secret",
+    "cloudhook_url",
     "access_token",
     "refresh_token",
     "token",
@@ -39,6 +42,14 @@ async def async_get_config_entry_diagnostics(
             [event.raw for event in data.events.recent_events], TO_REDACT
         ),
         "bluetooth": _bluetooth(data),
+        "push": {
+            "active": data.events.push_active,
+            "last_push": (
+                data.events.last_push.isoformat() if data.events.last_push else None
+            ),
+            "bold_webhooks": len(entry.data.get("bold_webhooks", {})),
+            "cloudhook": "cloudhook_url" in entry.data,
+        },
     }
 
 

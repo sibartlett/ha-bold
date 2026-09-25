@@ -33,6 +33,7 @@ from .const import (
     COMMAND_DEACTIVATE,
     OAUTH2_AUTHORIZE,
     OAUTH2_TOKEN,
+    WEBHOOK_SECRET_HEADER,
 )
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "OAUTH2_AUTHORIZE",
     "OAUTH2_TOKEN",
     "SERVICE_UUID",
+    "WEBHOOK_SECRET_HEADER",
     "BoldAdvertisement",
     "BoldAuthError",
     "BoldBluetoothError",

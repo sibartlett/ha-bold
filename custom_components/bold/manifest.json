@@ -2,7 +2,8 @@
   "domain": "bold",
   "name": "Bold Smart Lock",
   "after_dependencies": [
-    "bluetooth"
+    "bluetooth",
+    "cloud"
   ],
   "bluetooth": [
     {
@@ -15,7 +16,8 @@
   ],
   "config_flow": true,
   "dependencies": [
-    "application_credentials"
+    "application_credentials",
+    "webhook"
   ],
   "dhcp": [
     {
@@ -24,7 +26,7 @@
   ],
   "documentation": "https://github.com/sibartlett/ha-bold",
   "integration_type": "hub",
-  "iot_class": "cloud_polling",
+  "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/sibartlett/ha-bold/issues",
   "requirements": [],
   "version": "0.1.0"

@@ -29,6 +29,7 @@ from .coordinator import (
 from .entity import device_info
 from .issues import async_check_issues, async_delete_issues
 from .keys import BoldBluetoothKeys
+from .push import async_remove_push, async_setup_push
 from .tracker import BoldBluetoothTracker
 from .unlock import BoldUnlockMethods
 
@@ -45,21 +46,12 @@ PLATFORMS: list[Platform] = [
 async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool:
     """Set up Bold from a config entry."""
     try:
-        implementation = await async_get_config_entry_implementation(hass, entry)
+        client = await _async_create_client(hass, entry)
     except ImplementationUnavailableError as err:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
             translation_key="oauth2_implementation_unavailable",
         ) from err
-
-    session = OAuth2Session(hass, entry, implementation)
-
-    async def get_access_token() -> str:
-        await session.async_ensure_token_valid()
-        access_token: str = session.token["access_token"]
-        return access_token
-
-    client = BoldClient(async_get_clientsession(hass), get_access_token)
 
     devices = BoldDeviceCoordinator(hass, entry, client)
     await devices.async_config_entry_first_refresh()
@@ -86,7 +78,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
     await events.async_load_status_history(dt_util.utcnow() - BATTERY_VOLTAGE_HISTORY)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _async_setup_bluetooth(hass, entry)
+    async_setup_push(hass, entry)
     return True
+
+
+async def _async_create_client(
+    hass: HomeAssistant, entry: BoldConfigEntry
+) -> BoldClient:
+    """Create a Bold API client using the config entry's OAuth tokens."""
+    implementation = await async_get_config_entry_implementation(hass, entry)
+    session = OAuth2Session(hass, entry, implementation)
+
+    async def get_access_token() -> str:
+        await session.async_ensure_token_valid()
+        access_token: str = session.token["access_token"]
+        return access_token
+
+    return BoldClient(async_get_clientsession(hass), get_access_token)
 
 
 @callback
@@ -114,7 +122,12 @@ def _async_setup_bluetooth(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
-    """Delete the stored Bluetooth keys and issues when Bold is removed."""
+    """Delete Bold's webhooks, the stored Bluetooth keys and issues."""
+    try:
+        client: BoldClient | None = await _async_create_client(hass, entry)
+    except ImplementationUnavailableError:
+        client = None
+    await async_remove_push(hass, entry, client)
     await BoldBluetoothKeys.async_remove_stored(hass, entry.entry_id)
     async_delete_issues(hass)
 

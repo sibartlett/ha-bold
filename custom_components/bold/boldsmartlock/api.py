@@ -290,7 +290,11 @@ class BoldClient:
         self._get_access_token = get_access_token
 
     async def _request(
-        self, method: str, path: str, params: dict[str, Any] | None = None
+        self,
+        method: str,
+        path: str,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
     ) -> Any:
         """Make an authenticated request and return the decoded JSON body."""
         try:
@@ -307,6 +311,7 @@ class BoldClient:
                 method,
                 f"{API_URL}{path}",
                 params=params,
+                json=json,
                 headers={"Authorization": f"Bearer {token}"},
             ) as response:
                 if response.status == HTTPStatus.UNAUTHORIZED:
@@ -413,6 +418,51 @@ class BoldClient:
         ):
             raise BoldError(f"Unexpected response from GET {path}")
         return response
+
+    async def get_webhooks(self, organization_id: int) -> list[dict[str, Any]]:
+        """Return an organization's webhooks: id, webhookUrl and types."""
+        return await self._get_list("/v3/webhooks", {"organizationId": organization_id})
+
+    async def create_webhook(
+        self,
+        organization_id: int,
+        url: str,
+        event_types: list[str],
+        secret: str,
+    ) -> int:
+        """Create a webhook, returning its ID.
+
+        Bold sends events to the URL as a JSON list, in the format of the
+        event log, with the secret in the X-Bold-Secret header.
+        """
+        response = await self._request(
+            "POST",
+            "/v3/webhooks",
+            json={
+                "organizationId": organization_id,
+                "webhookUrl": url,
+                "types": event_types,
+                "secretHttp": secret,
+            },
+        )
+        webhook_id = response.get("id") if isinstance(response, dict) else None
+        if not isinstance(webhook_id, int):
+            raise BoldError("Unexpected response from POST /v3/webhooks")
+        return webhook_id
+
+    async def update_webhook(
+        self, webhook_id: int, url: str, event_types: list[str], secret: str
+    ) -> None:
+        """Update a webhook in place."""
+        await self._request(
+            "PUT",
+            f"/v3/webhooks/{webhook_id}",
+            json={"webhookUrl": url, "types": event_types, "secretHttp": secret},
+        )
+
+    async def delete_webhook(self, webhook_id: int) -> None:
+        """Delete a webhook."""
+        await self._request("DELETE", f"/v3/webhooks/{webhook_id}")
 
     async def remote_activation(self, device_id: int) -> timedelta | None:
         """Activate a device, returning how long it will stay active."""

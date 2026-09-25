@@ -33,6 +33,15 @@ async def test_diagnostics(
     ]
     assert diagnostics["event_log_devices"] == [LOCK_ID]
     assert diagnostics["recent_events"] == []
+    assert diagnostics["push"] == {
+        "active": False,
+        "last_push": None,
+        "bold_webhooks": 0,
+        "cloudhook": False,
+    }
+    # The webhook's ID and secret let anyone push events, so aren't included.
+    assert diagnostics["entry"]["webhook_id"] == REDACTED
+    assert diagnostics["entry"]["webhook_secret"] == REDACTED
     assert diagnostics["bluetooth"] == {
         "enabled": False,
         "locks": {

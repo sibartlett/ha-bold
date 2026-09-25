@@ -19,6 +19,19 @@ EVENT_POLL_OVERLAP: Final = timedelta(minutes=2)
 EVENT_CATCH_UP_INTERVAL: Final = timedelta(minutes=10)
 EVENT_CATCH_UP_LOOKBACK: Final = timedelta(hours=1)
 
+# While Bold pushes events to a webhook, polling is only a safety net.
+EVENT_PUSH_SCAN_INTERVAL: Final = timedelta(minutes=5)
+# The events the webhook is subscribed to.
+PUSHED_EVENT_TYPES: Final = [
+    "DeviceActivation",
+    "DeviceDeactivation",
+    "DeviceLocked",
+    "DeviceStatus",
+    "DeviceTamperFaultyPin",
+    "DeviceTamperRotations",
+    "DeviceTamperVibration",
+]
+
 # A Bold Connect is considered offline when Bold last heard from it this long
 # ago. It checks in every few minutes, and devices are polled every 10.
 CONNECT_OFFLINE_AFTER: Final = timedelta(minutes=30)

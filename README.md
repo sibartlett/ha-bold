@@ -84,19 +84,25 @@ ones removed from it are removed from Home Assistant.
 
 ## How data is updated
 
-Bold only offers push updates (webhooks) to business organizations, so the
-integration polls Bold's cloud:
+**Pushed within seconds**, when Home Assistant is reachable from the internet
+(through its external URL, or Home Assistant Cloud): the integration registers a
+webhook with Bold, which sends activations, bolt changes, tamper alerts and
+daily status reports as they happen. Deliveries are checked against a secret
+only Bold and Home Assistant know. The webhook is kept up to date across
+restarts, and removed with the integration.
 
-- **Activity** (the event log) every 30 seconds. Activations, changes to
-  `changed_by` and activity events show up within about 30 seconds of reaching
-  Bold. Locks upload their events when a Bold Connect or phone next syncs with
-  them, which can be later, so every 10 minutes a poll looks back an hour to
-  pick up events that arrived late, such as battery voltage readings.
-- **Battery voltages** come from a status report each lock
-  sends once a day, at a fixed time. They keep their last reading across
-  restarts, and start from the past week's readings when the integration is set
-  up.
+**Polled** otherwise, and as a safety net:
+
+- **Activity** (the event log) every 30 seconds, or every 5 minutes while
+  pushes are working. If a poll finds an event the webhook should have pushed,
+  polling goes back to every 30 seconds until the webhook delivers again.
+  Locks upload their events when a Bold Connect or phone next syncs with them,
+  which can be later, so every 10 minutes a poll looks back an hour to pick up
+  events that arrived late.
 - **Devices** (battery, signal, firmware, Bold Connect status) every 10 minutes.
+- **Battery voltages** come from a status report each lock sends once a day, at
+  a fixed time. They keep their last reading across restarts, and start from
+  the past week's readings when the integration is set up.
 
 Unlocking from Home Assistant updates the lock straight away.
 
@@ -177,11 +183,12 @@ actions:
 
 - **Bolt position needs an upgraded lock.** Other locks' state shows whether
   they're _activated_, not whether the bolt is thrown, as an assumed state.
-  Bolt changes appear within about 30 seconds.
+  Bolt changes appear within seconds with pushes, or about 30 seconds without.
 - **Lock can't throw the bolt.** Bold locks are turned by hand; **Lock** only
   ends an activation early.
 - **Delays.** Activity from outside Home Assistant (app, PIN, button, key fob)
-  appears within about 30 seconds. A Bold Connect going offline is noticed
+  appears within seconds when Bold can push it, and within about 30 seconds
+  otherwise. A Bold Connect going offline is noticed
   after 30–40 minutes.
 - **Bluetooth uses an undocumented part of Bold's API**, the one the Bold app
   uses. Bold could change it without notice; the Bold Connect keeps working
