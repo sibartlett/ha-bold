@@ -11,15 +11,15 @@
     },
     "abort": {
       "already_configured": "Account is already configured",
-      "already_in_progress": "Configuration flow is already in progress",
-      "authorize_url_timeout": "Timeout generating authorize URL.",
+      "already_in_progress": "This is already being configured. Finish the existing configuration before starting again.",
+      "authorize_url_timeout": "Timeout while generating an authorization URL.",
       "cannot_connect": "Failed to connect",
       "missing_configuration": "The component is not configured. Please follow the documentation.",
       "missing_credentials": "The integration requires application credentials.",
       "no_url_available": "No URL available. For information about this error, [check the help section]({docs_url})",
       "oauth_error": "Received invalid token data.",
       "oauth_failed": "Error while obtaining access token.",
-      "oauth_timeout": "Timeout resolving OAuth token.",
+      "oauth_timeout": "Timeout while resolving the OAuth token.",
       "oauth_unauthorized": "OAuth authorization error while obtaining access token.",
       "reauth_successful": "Re-authentication was successful",
       "user_rejected_authorize": "Account linking rejected: {error}",
@@ -42,6 +42,18 @@
               "tamper": "Tamper alert"
             }
           }
+        }
+      }
+    },
+    "sensor": {
+      "battery_level": {
+        "name": "Battery level",
+        "state": {
+          "excellent": "Excellent",
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low",
+          "critical": "Critical"
         }
       }
     }

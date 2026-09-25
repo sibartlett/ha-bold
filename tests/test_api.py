@@ -68,7 +68,7 @@ def test_device_from_api() -> None:
     assert device.name == "Front Door"
     assert device.is_lock
     assert device.model_name == "Smart Cylinder SX"
-    assert device.battery_level == 87
+    assert device.battery_level == "excellent"
     assert device.activation_time == timedelta(seconds=5)
     assert device.remote_access
     assert device.event_log
@@ -79,7 +79,7 @@ def test_device_from_api() -> None:
 
 def test_device_from_api_minimal() -> None:
     """Test parsing a device with most fields missing."""
-    device = BoldDevice.from_api({"id": 9, "batteryLevel": "LOW"})
+    device = BoldDevice.from_api({"id": 9, "batteryLevel": None})
     assert device.name == "Bold 9"
     assert not device.is_lock
     assert device.battery_level is None
@@ -107,6 +107,26 @@ def test_event_from_api() -> None:
     assert event.result == "Success"
     assert event.activation_time == timedelta(seconds=5)
     assert not event.remote_activation
+
+
+def test_event_remote_activation_via_connect() -> None:
+    """Test an activation through a Bold Connect counts as remote.
+
+    Bold doesn't always send remoteActivation; this is a real activation
+    from Home Assistant.
+    """
+    event = BoldEvent.from_api(
+        event_payload(
+            10,
+            "DeviceActivation",
+            "2026-09-25T04:15:09Z",
+            connect={"id": 2, "name": "Bold Connect"},
+            clientId="HomeAssistant",
+            method="Ble",
+            result="Success",
+        )
+    )
+    assert event.remote_activation
 
 
 def test_event_user_fallbacks() -> None:

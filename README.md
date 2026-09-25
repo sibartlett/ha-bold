@@ -12,7 +12,8 @@ turned by hand for a few seconds. Each lock gets:
 |---|---|
 | `lock.<name>` | **Unlock** activates the lock through your Bold Connect. The lock shows as unlocked while it is activated, and locked otherwise. This is an assumed state: without bolt position reporting, Home Assistant can't know whether the door was actually turned. **Lock** ends an activation early; it can't throw the bolt. `changed_by` shows who last activated or deactivated it. |
 | `event.<name>_activity` | Fires for activations (with the user and method: PIN, button, app…), failed activations such as a wrong PIN, deactivations, and tamper alerts. Only created for locks with the event log feature. |
-| `sensor.<name>_battery` | Battery level. |
+| `sensor.<name>_battery_level` | Battery level as Bold reports it: Excellent, High, Medium, Low or Critical. |
+| `binary_sensor.<name>_battery` | Low battery: on when the level is Low or Critical. |
 
 Locks without a Bold Connect show as unavailable, because they can't be
 activated remotely.

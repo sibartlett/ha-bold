@@ -49,7 +49,7 @@ LOCK = {
     "actualFirmwareVersion": 90,
     "requiredFirmwareVersion": 90,
     "timeZone": "Europe/Amsterdam",
-    "batteryLevel": "87",
+    "batteryLevel": "Excellent",
     "batteryLastMeasurement": "2026-09-24T09:00:00Z",
     "locked": "UNKNOWN",
     "entryTags": [],
@@ -130,7 +130,7 @@ def mock_api(
 @pytest.fixture
 def platforms() -> list[str]:
     """Platforms to set up; override in a test module to limit them."""
-    return ["event", "lock", "sensor"]
+    return ["binary_sensor", "event", "lock", "sensor"]
 
 
 @pytest.fixture

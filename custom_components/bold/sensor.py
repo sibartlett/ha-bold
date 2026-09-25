@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorStateClass,
-)
-from homeassistant.const import PERCENTAGE, EntityCategory
+import logging
+
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import BoldConfigEntry
 from .entity import BoldEntity
 
+_LOGGER = logging.getLogger(__name__)
+
 PARALLEL_UPDATES = 0
+
+# Bold reports battery levels as words, on the same scale as signal strength.
+BATTERY_LEVELS = ["excellent", "high", "medium", "low", "critical"]
 
 
 async def async_setup_entry(
@@ -25,21 +28,25 @@ async def async_setup_entry(
     """Set up Bold sensors."""
     coordinator = entry.runtime_data.devices
     async_add_entities(
-        BoldBatterySensor(coordinator, device, "battery")
+        BoldBatteryLevelSensor(coordinator, device, "battery_level")
         for device in coordinator.data.values()
         if device.is_lock
     )
 
 
-class BoldBatterySensor(BoldEntity, SensorEntity):
+class BoldBatteryLevelSensor(BoldEntity, SensorEntity):
     """Battery level of a Bold lock."""
 
-    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_device_class = SensorDeviceClass.ENUM
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_options = BATTERY_LEVELS
+    _attr_translation_key = "battery_level"
 
     @property
-    def native_value(self) -> int | None:
+    def native_value(self) -> str | None:
         """Return the battery level."""
-        return self.device.battery_level
+        level = self.device.battery_level
+        if level is not None and level not in BATTERY_LEVELS:
+            _LOGGER.debug("Unknown battery level %r for %s", level, self.device.name)
+            return None
+        return level

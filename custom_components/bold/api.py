@@ -147,7 +147,7 @@ class BoldDevice:
     organization_id: int | None
     actual_firmware_version: int | None
     required_firmware_version: int | None
-    battery_level: int | None
+    battery_level: str | None
     battery_last_measurement: datetime | None
     activation_time: timedelta | None
     is_active_until: datetime | None
@@ -163,10 +163,7 @@ class BoldDevice:
         features = data.get("features") or {}
         settings = data.get("settings") or {}
         gateway = data.get("gateway") or {}
-        try:
-            battery_level = int(data["batteryLevel"])
-        except (KeyError, TypeError, ValueError):
-            battery_level = None
+        battery_level = data.get("batteryLevel")
         return cls(
             id=data["id"],
             name=data.get("name") or f"Bold {data['id']}",
@@ -175,7 +172,9 @@ class BoldDevice:
             organization_id=(data.get("owner") or {}).get("organizationId"),
             actual_firmware_version=data.get("actualFirmwareVersion"),
             required_firmware_version=data.get("requiredFirmwareVersion"),
-            battery_level=battery_level,
+            battery_level=(
+                battery_level.lower() if isinstance(battery_level, str) else None
+            ),
             battery_last_measurement=parse_datetime(data.get("batteryLastMeasurement")),
             activation_time=parse_duration(settings.get("activationTime")),
             is_active_until=parse_datetime(data.get("isActiveUntil")),
@@ -235,7 +234,9 @@ class BoldEvent:
                 or _person_name(data.get("account"))
                 or _person_name(data.get("triggeredBy"))
             ),
-            remote_activation=bool(data.get("remoteActivation")),
+            # Remote activations name the Bold Connect they went through;
+            # "remoteActivation" is documented but not always sent.
+            remote_activation=bool(data.get("remoteActivation") or data.get("connect")),
             activation_time=parse_duration(data.get("activationTime")),
             keep_active_until=parse_datetime(data.get("keepActiveUntil")),
             raw=data,
