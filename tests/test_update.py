@@ -28,7 +28,12 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import DEVICE_SCAN_INTERVAL, DOMAIN
 
-from .conftest import GATEWAY, LOCK, LOCK_ID
+from .conftest import (
+    GATEWAY,
+    LOCK,
+    LOCK_ID,
+    setup_integration,
+)
 
 ENTITY_ID = "update.front_door_firmware"
 
@@ -37,19 +42,6 @@ ENTITY_ID = "update.front_door_firmware"
 def platforms() -> list[str]:
     """Only set up updates."""
     return ["update"]
-
-
-async def _setup(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    aioclient_mock: AiohttpClientMocker,
-    lock: dict,
-) -> None:
-    aioclient_mock.get(f"{API_URL}/v2/devices", json=[lock, GATEWAY])
-    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
-    mock_config_entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
 
 
 async def test_up_to_date(
@@ -86,7 +78,7 @@ async def test_versions(
         "actualFirmwareVersion": actual,
         "requiredFirmwareVersion": required,
     }
-    await _setup(hass, mock_config_entry, aioclient_mock, lock)
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [lock, GATEWAY])
     state = hass.states.get(ENTITY_ID)
     assert state.state == expected
     if expected == STATE_ON:
@@ -103,7 +95,7 @@ async def test_firmware_updated(
 ) -> None:
     """Test updating firmware in the Bold app updates the entity and device."""
     lock = {**LOCK, "actualFirmwareVersion": 89, "requiredFirmwareVersion": 90}
-    await _setup(hass, mock_config_entry, aioclient_mock, lock)
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [lock, GATEWAY])
     assert hass.states.get(ENTITY_ID).state == STATE_ON
 
     aioclient_mock.clear_requests()

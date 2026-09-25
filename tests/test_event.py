@@ -9,35 +9,29 @@ from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
-    async_fire_time_changed,
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import EVENT_SCAN_INTERVAL
 
-from .conftest import GATEWAY, LOCK, event_payload, set_events
+from .conftest import (
+    GATEWAY,
+    LOCK,
+    advance,
+    event_payload,
+    set_events,
+)
+
+pytestmark = pytest.mark.usefixtures("frozen_time")
 
 ENTITY_ID = "event.front_door_activity"
-
-
-@pytest.fixture(autouse=True)
-def frozen_time(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
-    """Freeze time."""
-    freezer.move_to("2026-09-24T12:00:00+00:00")
-    return freezer
 
 
 @pytest.fixture
 def platforms() -> list[str]:
     """Only set up events."""
     return ["event"]
-
-
-async def _poll(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
-    freezer.tick(EVENT_SCAN_INTERVAL)
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
 
 
 async def test_history_is_not_replayed(
@@ -58,7 +52,7 @@ async def test_history_is_not_replayed(
     await hass.async_block_till_done()
     assert hass.states.get(ENTITY_ID).state == STATE_UNKNOWN
 
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(ENTITY_ID).state == STATE_UNKNOWN
 
 
@@ -78,7 +72,7 @@ async def test_activation_event(
         result="Success",
     )
     set_events(mock_api, [event])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
 
     state = hass.states.get(ENTITY_ID)
     assert state.state == "2026-09-24T12:00:30.000+00:00"
@@ -90,7 +84,7 @@ async def test_activation_event(
     assert state.attributes["bold_event_id"] == 10
 
     # The same event is returned by the next poll, but must not fire again.
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(ENTITY_ID).state == "2026-09-24T12:00:30.000+00:00"
 
 
@@ -131,7 +125,7 @@ async def test_event_types(
 ) -> None:
     """Test Bold events map to event types."""
     set_events(mock_api, [event])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
 
     state = hass.states.get(ENTITY_ID)
     assert state.attributes[ATTR_EVENT_TYPE] == event_type
@@ -157,5 +151,5 @@ async def test_other_events_ignored(
             other_device,
         ],
     )
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(ENTITY_ID).state == STATE_UNKNOWN

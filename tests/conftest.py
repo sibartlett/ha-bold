@@ -6,18 +6,25 @@ import asyncio
 import base64
 from collections.abc import Callable, Coroutine, Generator
 import copy
+from datetime import timedelta
 import time
 from typing import Any
 from unittest.mock import patch
 
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.application_credentials import (
     ClientCredential,
     async_import_client_credential,
 )
+from homeassistant.components.lock import DOMAIN as LOCK_DOMAIN
+from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL
@@ -85,6 +92,10 @@ GATEWAY = {
     "features": {"remoteAccess": False, "eventLog": False},
     "locked": "UNKNOWN",
 }
+
+# Tests run at this time, with the frozen_time fixture.
+NOW = "2026-09-24T12:00:00+00:00"
+LOCK_ENTITY = "lock.front_door"
 
 
 @pytest.fixture(autouse=True)
@@ -164,6 +175,50 @@ async def init_integration(
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
     return mock_config_entry
+
+
+@pytest.fixture
+def frozen_time(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
+    """Freeze time at NOW."""
+    freezer.move_to(NOW)
+    return freezer
+
+
+async def advance(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, delta: timedelta
+) -> None:
+    """Move time forward, and let Home Assistant catch up, e.g. to poll."""
+    freezer.tick(delta)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+
+async def setup_integration(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    devices: list[dict],
+) -> None:
+    """Set up the integration, with Bold returning these devices and no events."""
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=devices)
+    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def call_lock(
+    hass: HomeAssistant, service: str, entity_id: str = LOCK_ENTITY
+) -> None:
+    """Call a lock service, e.g. to unlock."""
+    await hass.services.async_call(
+        LOCK_DOMAIN, service, {ATTR_ENTITY_ID: entity_id}, blocking=True
+    )
+
+
+def count_calls(aioclient_mock: AiohttpClientMocker, path: str) -> int:
+    """Return how many requests were made to URLs containing path."""
+    return sum(1 for call in aioclient_mock.mock_calls if path in str(call[1]))
 
 
 def event_payload(event_id: int, event_type: str, time: str, **extra: Any) -> dict:

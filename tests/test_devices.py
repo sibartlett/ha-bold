@@ -11,7 +11,6 @@ from homeassistant.setup import async_setup_component
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
-    async_fire_time_changed,
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
@@ -25,17 +24,19 @@ from custom_components.bold.const import (
     EVENT_SCAN_INTERVAL,
 )
 
-from .conftest import GATEWAY, GATEWAY_ID, LOCK, LOCK_ID, event_payload
+from .conftest import (
+    GATEWAY,
+    GATEWAY_ID,
+    LOCK,
+    LOCK_ID,
+    advance,
+    event_payload,
+)
+
+pytestmark = pytest.mark.usefixtures("frozen_time")
 
 NEW_LOCK_ID = 5
 NEW_LOCK = {**copy.deepcopy(LOCK), "id": NEW_LOCK_ID, "name": "Garage"}
-
-
-@pytest.fixture(autouse=True)
-def frozen_time(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
-    """Freeze time."""
-    freezer.move_to("2026-09-24T12:00:00+00:00")
-    return freezer
 
 
 def _mock_api(
@@ -44,12 +45,6 @@ def _mock_api(
     aioclient_mock.clear_requests()
     aioclient_mock.get(f"{API_URL}/v2/devices", json=devices)
     aioclient_mock.get(f"{API_URL}/v2/events", json=events)
-
-
-async def _advance(hass: HomeAssistant, freezer: FrozenDateTimeFactory, delta) -> None:
-    freezer.tick(delta)
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
 
 
 def _device(
@@ -76,7 +71,7 @@ async def test_lock_added(
     )
     old_event["device"] = {"id": NEW_LOCK_ID}
     _mock_api(aioclient_mock, [LOCK, NEW_LOCK, GATEWAY], [old_event])
-    await _advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
 
     for entity_id in (
         "lock.garage",
@@ -92,7 +87,7 @@ async def test_lock_added(
     )
     assert init_integration.runtime_data.events.device_ids == [LOCK_ID, NEW_LOCK_ID]
 
-    await _advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get("event.garage_activity").state == "unknown"
 
     # New activity does fire.
@@ -101,7 +96,7 @@ async def test_lock_added(
     )
     new_event["device"] = {"id": NEW_LOCK_ID}
     _mock_api(aioclient_mock, [LOCK, NEW_LOCK, GATEWAY], [old_event, new_event])
-    await _advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     state = hass.states.get("event.garage_activity")
     assert state.attributes["event_type"] == "activated"
     assert state.attributes["bold_event_id"] == 51
@@ -117,7 +112,7 @@ async def test_lock_removed(
 ) -> None:
     """Test a lock removed from Bold is removed, and returns if re-added."""
     _mock_api(aioclient_mock, [GATEWAY], [])
-    await _advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
 
     assert _device(device_registry, init_integration, LOCK_ID) is None
     assert entity_registry.async_get("lock.front_door") is None
@@ -126,7 +121,7 @@ async def test_lock_removed(
     assert init_integration.runtime_data.events.device_ids == []
 
     _mock_api(aioclient_mock, [LOCK, GATEWAY], [])
-    await _advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
     assert hass.states.get("lock.front_door") is not None
 
 
@@ -141,7 +136,7 @@ async def test_failed_poll_keeps_devices(
     aioclient_mock.clear_requests()
     aioclient_mock.get(f"{API_URL}/v2/devices", status=500)
     aioclient_mock.get(f"{API_URL}/v2/events", json=[])
-    await _advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
 
     assert _device(device_registry, init_integration, LOCK_ID) is not None
     assert hass.states.get("lock.front_door").state == "unavailable"

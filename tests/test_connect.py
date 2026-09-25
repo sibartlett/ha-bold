@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -12,30 +11,17 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
 
-from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import DOMAIN
 
-from .conftest import GATEWAY, GATEWAY_ID, LOCK, LOCK_ID
+from .conftest import (
+    GATEWAY,
+    GATEWAY_ID,
+    LOCK,
+    LOCK_ID,
+    setup_integration,
+)
 
-
-@pytest.fixture(autouse=True)
-def frozen_time(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
-    """Freeze time, 5 minutes after the Connect was last seen."""
-    freezer.move_to("2026-09-24T12:00:00+00:00")
-    return freezer
-
-
-async def _setup(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    aioclient_mock: AiohttpClientMocker,
-    devices: list[dict],
-) -> None:
-    aioclient_mock.get(f"{API_URL}/v2/devices", json=devices)
-    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
-    mock_config_entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+pytestmark = pytest.mark.usefixtures("frozen_time")
 
 
 async def test_connect_device(
@@ -87,7 +73,7 @@ async def test_connect_offline(
         **GATEWAY,
         "gateway": {**GATEWAY["gateway"], "lastSeen": "2026-09-24T11:30:00Z"},
     }
-    await _setup(hass, mock_config_entry, aioclient_mock, [LOCK, gateway])
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, gateway])
     assert hass.states.get("binary_sensor.bold_connect_connectivity").state == STATE_OFF
 
 
@@ -99,7 +85,7 @@ async def test_connect_never_seen(
 ) -> None:
     """Test a Connect without a last seen time is unknown."""
     gateway = {key: value for key, value in GATEWAY.items() if key != "gateway"}
-    await _setup(hass, mock_config_entry, aioclient_mock, [LOCK, gateway])
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, gateway])
     assert (
         hass.states.get("binary_sensor.bold_connect_connectivity").state
         == STATE_UNKNOWN
@@ -144,7 +130,9 @@ async def test_lock_without_connect(
     device_registry: dr.DeviceRegistry,
 ) -> None:
     """Test a lock without a Connect has no signal sensors or link."""
-    await _setup(hass, mock_config_entry, aioclient_mock, [{**LOCK, "gateway": None}])
+    await setup_integration(
+        hass, mock_config_entry, aioclient_mock, [{**LOCK, "gateway": None}]
+    )
     assert not hass.states.get("sensor.front_door_bold_connect_signal")
     lock = device_registry.async_get_device_by_identifier(
         (DOMAIN, str(LOCK_ID)), mock_config_entry.entry_id

@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.lock import (
     DATA_COMPONENT as LOCK_COMPONENT,
-    DOMAIN as LOCK_DOMAIN,
     SERVICE_LOCK,
     SERVICE_UNLOCK,
     LockState,
@@ -47,30 +46,18 @@ from .conftest import (
     DEACTIVATE_COMMAND,
     GATEWAY,
     LOCK,
+    LOCK_ENTITY,
     LOCK_ID,
     FakeBluetooth,
+    call_lock,
+    count_calls,
     mock_bluetooth_keys,
+    setup_integration,
 )
 
-LOCK_ENTITY = "lock.front_door"
+pytestmark = pytest.mark.usefixtures("frozen_time")
+
 SELECT_ENTITY = "select.front_door_unlock_method"
-
-
-@pytest.fixture(autouse=True)
-def frozen_time(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
-    """Freeze time."""
-    freezer.move_to("2026-09-24T12:00:00+00:00")
-    return freezer
-
-
-def _remote_calls(aioclient_mock: AiohttpClientMocker, command: str) -> int:
-    return sum(1 for call in aioclient_mock.mock_calls if command in str(call[1]))
-
-
-async def _call(hass: HomeAssistant, service: str) -> None:
-    await hass.services.async_call(
-        LOCK_DOMAIN, service, {ATTR_ENTITY_ID: LOCK_ENTITY}, blocking=True
-    )
 
 
 async def _set_method(hass: HomeAssistant, option: str) -> None:
@@ -82,19 +69,6 @@ async def _set_method(hass: HomeAssistant, option: str) -> None:
     )
 
 
-async def _setup(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    aioclient_mock: AiohttpClientMocker,
-    devices: list[dict],
-) -> None:
-    aioclient_mock.get(f"{API_URL}/v2/devices", json=devices)
-    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
-    mock_config_entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-
 async def test_default_prefers_connect(
     hass: HomeAssistant,
     fake_bluetooth: FakeBluetooth,
@@ -103,9 +77,9 @@ async def test_default_prefers_connect(
 ) -> None:
     """Test locks use the Bold Connect by default, even in Bluetooth range."""
     assert hass.states.get(SELECT_ENTITY).state == "prefer_connect"
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == []
-    assert _remote_calls(mock_api, "remote-activation") == 1
+    assert count_calls(mock_api, "remote-activation") == 1
 
 
 async def test_prefer_connect_falls_back_to_bluetooth(
@@ -120,9 +94,9 @@ async def test_prefer_connect_falls_back_to_bluetooth(
         f"{API_URL}/v1/devices/{LOCK_ID}/remote-activation",
         json={"deviceId": LOCK_ID, "errorCode": "gatewayNotFoundError"},
     )
-    await _setup(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
     mock_config_entry.runtime_data.bluetooth._rssi[LOCK_ID] = -95  # noqa: SLF001
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND]
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
@@ -136,12 +110,12 @@ async def test_unlock_prefers_bluetooth(
 ) -> None:
     """Test preferring Bluetooth for a lock in range."""
     await _set_method(hass, "prefer_bluetooth")
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND]
-    assert _remote_calls(mock_api, "remote-activation") == 0
+    assert count_calls(mock_api, "remote-activation") == 0
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
-    await _call(hass, SERVICE_LOCK)
+    await call_lock(hass, SERVICE_LOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND, DEACTIVATE_COMMAND]
     assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
@@ -155,7 +129,7 @@ async def test_bluetooth_activation_time(
     """Test the lock stays unlocked for the time the lock reports."""
     await _set_method(hass, "prefer_bluetooth")
     fake_bluetooth.activation_time = 20
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     frozen_time.tick(19)
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
@@ -176,8 +150,8 @@ async def test_bluetooth_falls_back_to_connect(
     """Test a failed Bluetooth unlock falls back to the Bold Connect."""
     await _set_method(hass, "prefer_bluetooth")
     fake_bluetooth.error = BoldBluetoothError("Timed out talking to the lock")
-    await _call(hass, SERVICE_UNLOCK)
-    assert _remote_calls(mock_api, "remote-activation") == 1
+    await call_lock(hass, SERVICE_UNLOCK)
+    assert count_calls(mock_api, "remote-activation") == 1
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
     assert "over bluetooth (Timed out talking to the lock), trying connect" in (
         caplog.text
@@ -192,9 +166,9 @@ async def test_prefer_connect(
 ) -> None:
     """Test preferring the Bold Connect."""
     await _set_method(hass, "prefer_connect")
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == []
-    assert _remote_calls(mock_api, "remote-activation") == 1
+    assert count_calls(mock_api, "remote-activation") == 1
 
 
 async def test_connect_only(
@@ -205,9 +179,9 @@ async def test_connect_only(
 ) -> None:
     """Test never using Bluetooth."""
     await _set_method(hass, "connect_only")
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == []
-    assert _remote_calls(mock_api, "remote-activation") == 1
+    assert count_calls(mock_api, "remote-activation") == 1
 
 
 async def test_bluetooth_only(
@@ -220,8 +194,8 @@ async def test_bluetooth_only(
     await _set_method(hass, "bluetooth_only")
     fake_bluetooth.error = BoldBluetoothError("The lock denied access")
     with pytest.raises(HomeAssistantError, match="over Bluetooth failed"):
-        await _call(hass, SERVICE_UNLOCK)
-    assert _remote_calls(mock_api, "remote-activation") == 0
+        await call_lock(hass, SERVICE_UNLOCK)
+    assert count_calls(mock_api, "remote-activation") == 0
 
     # Out of range, there's no way to reach the lock.
     init_integration.runtime_data.bluetooth.async_mark_unreachable(LOCK_ID)
@@ -238,7 +212,7 @@ async def test_bluetooth_lost_before_sending(
     await _set_method(hass, "bluetooth_only")
     fake_bluetooth.ble_device = None
     with pytest.raises(HomeAssistantError, match="can't be reached over Bluetooth"):
-        await _call(hass, SERVICE_UNLOCK)
+        await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == []
 
 
@@ -264,9 +238,9 @@ async def test_out_of_range_uses_connect(
     """Test a lock out of Bluetooth range is unlocked through the Connect."""
     await _set_method(hass, "prefer_bluetooth")
     init_integration.runtime_data.bluetooth.async_mark_unreachable(LOCK_ID)
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == []
-    assert _remote_calls(mock_api, "remote-activation") == 1
+    assert count_calls(mock_api, "remote-activation") == 1
 
 
 async def test_bluetooth_when_cloud_is_down(
@@ -285,7 +259,7 @@ async def test_bluetooth_when_cloud_is_down(
     await hass.async_block_till_done()
 
     assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND]
 
 
@@ -297,17 +271,19 @@ async def test_lock_without_connect(
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
     """Test a lock without a Bold Connect works over Bluetooth only."""
-    await _setup(hass, mock_config_entry, aioclient_mock, [{**LOCK, "gateway": None}])
+    await setup_integration(
+        hass, mock_config_entry, aioclient_mock, [{**LOCK, "gateway": None}]
+    )
     # With nothing to choose between, there's no unlock method setting.
     assert hass.states.get(SELECT_ENTITY) is None
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND]
 
     mock_config_entry.runtime_data.bluetooth.async_mark_unreachable(LOCK_ID)
     await hass.async_block_till_done()
     assert hass.states.get(LOCK_ENTITY).state == STATE_UNAVAILABLE
     # Home Assistant doesn't act on unavailable entities.
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND]
 
 
@@ -326,8 +302,8 @@ async def test_no_keys_uses_connect(
         f"{API_URL}/v1/devices/{LOCK_ID}/remote-activation",
         json={"deviceId": LOCK_ID, "errorCode": "OK", "activationTime": 5},
     )
-    await _setup(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
-    await _call(hass, SERVICE_UNLOCK)
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == []
 
 
@@ -340,7 +316,7 @@ async def test_unlock_method_restored(
 ) -> None:
     """Test the unlock method survives a restart."""
     mock_restore_cache(hass, [State(SELECT_ENTITY, "connect_only")])
-    await _setup(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
     assert hass.states.get(SELECT_ENTITY).state == "connect_only"
 
 
@@ -389,13 +365,13 @@ async def test_weak_signal_uses_connect(
     await _set_method(hass, "prefer_bluetooth")
     tracker = init_integration.runtime_data.bluetooth
     tracker._rssi[LOCK_ID] = -92  # noqa: SLF001
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == []
-    assert _remote_calls(mock_api, "remote-activation") == 1
+    assert count_calls(mock_api, "remote-activation") == 1
 
     # With Bluetooth only, a weak signal is still worth trying.
     await _set_method(hass, "bluetooth_only")
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND]
 
 
@@ -460,7 +436,7 @@ async def test_unlocking_shown_while_unlocking(
     """Test the lock shows as unlocking straight away, over Bluetooth."""
     await _set_method(hass, "bluetooth_only")
     fake_bluetooth.started = asyncio.Event()
-    unlock = hass.async_create_task(_call(hass, SERVICE_UNLOCK))
+    unlock = hass.async_create_task(call_lock(hass, SERVICE_UNLOCK))
     await fake_bluetooth.started.wait()
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKING
 
@@ -475,7 +451,7 @@ async def test_unlocking_shown_while_unlocking(
     # Locking shows as locking.
     fake_bluetooth.started = asyncio.Event()
     fake_bluetooth.release = asyncio.Event()
-    lock = hass.async_create_task(_call(hass, SERVICE_LOCK))
+    lock = hass.async_create_task(call_lock(hass, SERVICE_LOCK))
     await fake_bluetooth.started.wait()
     assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKING
     fake_bluetooth.release.set()
@@ -488,7 +464,7 @@ async def test_unlocking_shown_through_connect(
 ) -> None:
     """Test the lock shows as unlocking through the Bold Connect too."""
     states = _record_states(hass)
-    await _call(hass, SERVICE_UNLOCK)
+    await call_lock(hass, SERVICE_UNLOCK)
     assert states == [LockState.UNLOCKING, LockState.UNLOCKED]
 
 
@@ -502,7 +478,7 @@ async def test_failed_unlock_stops_unlocking(
     fake_bluetooth.error = BoldBluetoothError("The lock denied access")
     states = _record_states(hass)
     with pytest.raises(HomeAssistantError):
-        await _call(hass, SERVICE_UNLOCK)
+        await call_lock(hass, SERVICE_UNLOCK)
     assert states == [LockState.UNLOCKING, LockState.LOCKED]
 
 

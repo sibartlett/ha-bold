@@ -37,16 +37,11 @@ from custom_components.bold.push import (
 
 from .conftest import GATEWAY, LOCK, event_payload, set_events
 
+pytestmark = pytest.mark.usefixtures("frozen_time")
+
 ORGANIZATION_ID = 7  # The test lock's organization.
 WEBHOOKS = f"{API_URL}/v3/webhooks"
 ACTIVITY = "event.front_door_activity"
-
-
-@pytest.fixture(autouse=True)
-def frozen_time(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
-    """Freeze time."""
-    freezer.move_to("2026-09-24T12:00:00+00:00")
-    return freezer
 
 
 @pytest.fixture

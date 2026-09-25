@@ -8,7 +8,6 @@ from homeassistant.core import HomeAssistant, State
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
-    async_fire_time_changed,
     mock_restore_cache_with_extra_data,
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
@@ -18,7 +17,16 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import EVENT_SCAN_INTERVAL
 
-from .conftest import GATEWAY, LOCK, event_payload, set_events
+from .conftest import (
+    GATEWAY,
+    LOCK,
+    advance,
+    event_payload,
+    set_events,
+    setup_integration,
+)
+
+pytestmark = pytest.mark.usefixtures("frozen_time")
 
 IDLE = "sensor.front_door_battery_voltage"
 UNDER_LOAD = "sensor.front_door_battery_voltage_under_load"
@@ -46,23 +54,10 @@ DEBUG_EVENT = event_payload(
 )
 
 
-@pytest.fixture(autouse=True)
-def frozen_time(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
-    """Freeze time."""
-    freezer.move_to("2026-09-24T12:00:00+00:00")
-    return freezer
-
-
 @pytest.fixture
 def platforms() -> list[str]:
     """Only set up sensors."""
     return ["sensor"]
-
-
-async def _poll(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
-    freezer.tick(EVENT_SCAN_INTERVAL)
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
 
 
 async def test_voltage_from_debug_event(
@@ -78,7 +73,7 @@ async def test_voltage_from_debug_event(
     """
     assert hass.states.get(IDLE).state == STATE_UNKNOWN
     set_events(mock_api, [DEBUG_EVENT])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
 
     state = hass.states.get(IDLE)
     assert state.state == "3.063"
@@ -114,7 +109,7 @@ async def test_daily_status(
 ) -> None:
     """Test the voltages from the daily status."""
     set_events(mock_api, [_status(21, "2026-09-24T12:00:10Z", 3061, 2945, 18)])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(IDLE).state == "3.061"
     assert hass.states.get(UNDER_LOAD).state == "2.945"
     # The daily status's average temperature isn't a current reading, so it
@@ -130,9 +125,9 @@ async def test_status_without_load_measurement(
 ) -> None:
     """Test a status reporting 0 under load (not measured) is ignored for it."""
     set_events(mock_api, [_status(21, "2026-09-24T12:00:10Z", 3061, 2945, 18)])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     set_events(mock_api, [_status(22, "2026-09-24T12:00:40Z", 3073, 0, -2)])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(IDLE).state == "3.073"
     assert hass.states.get(UNDER_LOAD).state == "2.945"
 
@@ -147,7 +142,7 @@ async def test_non_numeric_voltage_ignored(
     status = _status(21, "2026-09-24T12:00:10Z", 3061, 2945, 18)
     status |= {"voltageIdle": "n/a", "voltageUnderLoad": True, "uptime": None}
     set_events(mock_api, [status])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(IDLE).state == STATE_UNKNOWN
     assert hass.states.get(UNDER_LOAD).state == STATE_UNKNOWN
 
@@ -167,7 +162,7 @@ async def test_other_events_ignored(
         24, "DeviceActivation", "2026-09-24T12:00:10Z", result="Success"
     )
     set_events(mock_api, [other_device, no_body, activation])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(IDLE).state == STATE_UNKNOWN
     assert hass.states.get(UNDER_LOAD).state == STATE_UNKNOWN
 
@@ -203,11 +198,7 @@ async def test_voltage_restored(
             )
         ],
     )
-    aioclient_mock.get(f"{API_URL}/v2/devices", json=[LOCK, GATEWAY])
-    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
-    mock_config_entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
     assert hass.states.get(IDLE).state == "3.01"
 
 
@@ -286,10 +277,10 @@ async def test_boot_status_ignored_for_load(
     load yet, so it reports its voltage at rest for both.
     """
     set_events(mock_api, [_status(21, "2026-09-24T12:00:05Z", 3061, 2945, 18)])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     boot = _status(22, "2026-09-24T12:00:30Z", 3054, 3054, 21)
     boot["uptime"] = 1
     set_events(mock_api, [boot])
-    await _poll(hass, frozen_time)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(IDLE).state == "3.054"
     assert hass.states.get(UNDER_LOAD).state == "2.945"
