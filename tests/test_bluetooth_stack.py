@@ -24,6 +24,7 @@ from custom_components.bold.ble import (
     BoldBleSession,
     BoldBluetoothError,
     BoldCryptor,
+    _async_disconnect,
     async_send_command,
     encode_packet,
 )
@@ -86,10 +87,57 @@ async def test_send_command_over_bleak() -> None:
             HANDSHAKE_KEY,
             HANDSHAKE_PAYLOAD,
             ACTIVATE_COMMAND,
-            5,
+            timeout=5,
         )
     assert activation_time == 15
     assert lock.commands == [ACTIVATE_COMMAND]
+    assert client.disconnected
+
+
+async def test_send_command_disconnects_later() -> None:
+    """Test the result comes before the disconnect, which ignores errors."""
+    lock = FakeLock()
+    client = FakeBleakClient(lock)
+    disconnects: list = []
+    with patch(
+        "bleak_retry_connector.establish_connection", AsyncMock(return_value=client)
+    ):
+        activation_time = await async_send_command(
+            SimpleNamespace(name="lock", address=ADDRESS),  # type: ignore[arg-type]
+            HANDSHAKE_KEY,
+            HANDSHAKE_PAYLOAD,
+            ACTIVATE_COMMAND,
+            timeout=5,
+            disconnect_later=disconnects.append,
+        )
+    assert activation_time == 15
+    assert not client.disconnected
+    await disconnects[0]
+    assert client.disconnected
+
+    # A failing disconnect doesn't matter: the command already succeeded.
+    client.disconnect = AsyncMock(side_effect=BleakError("gone"))  # type: ignore[method-assign]
+    await _async_disconnect(client)
+
+
+async def test_send_command_error_disconnects_first() -> None:
+    """Test the lock is disconnected before an error is raised."""
+    lock = FakeLock(result=0xF0)
+    client = FakeBleakClient(lock)
+    with (
+        patch(
+            "bleak_retry_connector.establish_connection", AsyncMock(return_value=client)
+        ),
+        pytest.raises(BoldBluetoothError, match="denied"),
+    ):
+        await async_send_command(
+            SimpleNamespace(name="lock", address=ADDRESS),  # type: ignore[arg-type]
+            HANDSHAKE_KEY,
+            HANDSHAKE_PAYLOAD,
+            ACTIVATE_COMMAND,
+            timeout=5,
+            disconnect_later=lambda _disconnect: pytest.fail("not on errors"),
+        )
     assert client.disconnected
 
 
@@ -110,7 +158,7 @@ async def test_send_command_errors(error: Exception, message: str) -> None:
             HANDSHAKE_KEY,
             HANDSHAKE_PAYLOAD,
             ACTIVATE_COMMAND,
-            5,
+            timeout=5,
         )
 
 

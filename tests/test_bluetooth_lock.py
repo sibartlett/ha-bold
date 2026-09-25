@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.lock import (
     DOMAIN as LOCK_DOMAIN,
@@ -13,8 +15,13 @@ from homeassistant.components.select import (
     DOMAIN as SELECT_DOMAIN,
     SERVICE_SELECT_OPTION,
 )
-from homeassistant.const import ATTR_ENTITY_ID, ATTR_OPTION, STATE_UNAVAILABLE
-from homeassistant.core import HomeAssistant, State
+from homeassistant.const import (
+    ATTR_ENTITY_ID,
+    ATTR_OPTION,
+    EVENT_STATE_CHANGED,
+    STATE_UNAVAILABLE,
+)
+from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_component import async_update_entity
 import pytest
@@ -399,3 +406,70 @@ async def test_no_bluetooth_signal_sensor_without_bluetooth(
 ) -> None:
     """Test Home Assistant without Bluetooth gets no Bluetooth signal sensor."""
     assert hass.states.get("sensor.front_door_bluetooth_signal") is None
+
+
+def _record_states(hass: HomeAssistant) -> list[str]:
+    """Record every state the front door lock goes through."""
+    states: list[str] = []
+
+    @callback
+    def record(event: Event) -> None:
+        if event.data["entity_id"] == LOCK_ENTITY and event.data["new_state"]:
+            states.append(event.data["new_state"].state)
+
+    hass.bus.async_listen(EVENT_STATE_CHANGED, record)
+    return states
+
+
+async def test_unlocking_shown_while_unlocking(
+    hass: HomeAssistant,
+    fake_bluetooth: FakeBluetooth,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Test the lock shows as unlocking straight away, over Bluetooth."""
+    await _set_method(hass, "bluetooth_only")
+    fake_bluetooth.started = asyncio.Event()
+    unlock = hass.async_create_task(_call(hass, SERVICE_UNLOCK))
+    await fake_bluetooth.started.wait()
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKING
+
+    fake_bluetooth.release.set()
+    await unlock
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+    # The disconnect happens after the result, in the background.
+    await hass.async_block_till_done()
+    assert fake_bluetooth.disconnects == 1
+
+    # Locking shows as locking.
+    fake_bluetooth.started = asyncio.Event()
+    fake_bluetooth.release = asyncio.Event()
+    lock = hass.async_create_task(_call(hass, SERVICE_LOCK))
+    await fake_bluetooth.started.wait()
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKING
+    fake_bluetooth.release.set()
+    await lock
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+
+
+async def test_unlocking_shown_through_connect(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Test the lock shows as unlocking through the Bold Connect too."""
+    states = _record_states(hass)
+    await _call(hass, SERVICE_UNLOCK)
+    assert states == [LockState.UNLOCKING, LockState.UNLOCKED]
+
+
+async def test_failed_unlock_stops_unlocking(
+    hass: HomeAssistant,
+    fake_bluetooth: FakeBluetooth,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Test a failed unlock returns the lock to its real state."""
+    await _set_method(hass, "bluetooth_only")
+    fake_bluetooth.error = BoldBluetoothError("The lock denied access")
+    states = _record_states(hass)
+    with pytest.raises(HomeAssistantError):
+        await _call(hass, SERVICE_UNLOCK)
+    assert states == [LockState.UNLOCKING, LockState.LOCKED]

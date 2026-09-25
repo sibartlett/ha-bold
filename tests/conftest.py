@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
-from collections.abc import Generator
+from collections.abc import Callable, Coroutine, Generator
 import copy
 import time
 from typing import Any
@@ -248,6 +249,10 @@ class FakeBluetooth:
         self.sent: list[bytes] = []
         self.error: Exception | None = None
         self.activation_time = 15
+        self.disconnects = 0
+        # Set these to pause a command until released.
+        self.started: asyncio.Event | None = None
+        self.release = asyncio.Event()
 
     async def send_command(
         self,
@@ -255,15 +260,25 @@ class FakeBluetooth:
         handshake_key: bytes,
         handshake_payload: bytes,
         command: bytes,
+        *,
         timeout: float,
+        disconnect_later: Callable[[Coroutine[Any, Any, None]], None] | None = None,
     ) -> int:
         assert ble_device is self.ble_device
         assert handshake_key == HANDSHAKE_KEY
         assert handshake_payload == HANDSHAKE_PAYLOAD
         if self.error:
             raise self.error
+        if self.started is not None:
+            self.started.set()
+            await self.release.wait()
         self.sent.append(command)
+        if disconnect_later is not None:
+            disconnect_later(self._disconnect())
         return self.activation_time
+
+    async def _disconnect(self) -> None:
+        self.disconnects += 1
 
 
 @pytest.fixture

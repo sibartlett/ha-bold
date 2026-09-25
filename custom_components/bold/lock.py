@@ -8,6 +8,7 @@ unlocked while it is activated and locked otherwise, as an assumed state.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Coroutine
 from datetime import datetime, timedelta
 import logging
 from typing import Any
@@ -102,6 +103,7 @@ class BoldLock(BoldEntity, LockEntity):
         self._data = data
         self._events = data.events
         self._bluetooth_lock = asyncio.Lock()
+        self._disconnecting: asyncio.Task[None] | None = None
         self._activated_at: datetime | None = None
         self._active_until: datetime | None = None
         self._unsub_expiry: CALLBACK_TYPE | None = None
@@ -181,7 +183,7 @@ class BoldLock(BoldEntity, LockEntity):
 
     async def async_unlock(self, **kwargs: Any) -> None:
         """Activate the lock, so it can be turned by hand."""
-        duration = await self._async_send(COMMAND_ACTIVATE)
+        duration = await self._async_send_showing_progress(COMMAND_ACTIVATE)
         now = dt_util.utcnow()
         self._set_active(now, now + (duration or self._activation_time))
         self.async_write_ha_state()
@@ -190,9 +192,25 @@ class BoldLock(BoldEntity, LockEntity):
         """End an activation early. Bold locks can't throw the bolt themselves."""
         if not self._is_active:
             return
-        await self._async_send(COMMAND_DEACTIVATE)
+        await self._async_send_showing_progress(COMMAND_DEACTIVATE)
         self._set_inactive(dt_util.utcnow())
         self.async_write_ha_state()
+
+    async def _async_send_showing_progress(self, command_type: str) -> timedelta | None:
+        """Send a command, showing the lock as unlocking or locking meanwhile."""
+        unlocking = command_type == COMMAND_ACTIVATE
+        self._attr_is_unlocking = unlocking
+        self._attr_is_locking = not unlocking
+        self.async_write_ha_state()
+        try:
+            return await self._async_send(command_type)
+        except HomeAssistantError:
+            self._attr_is_unlocking = self._attr_is_locking = False
+            self.async_write_ha_state()
+            raise
+        finally:
+            # On success, the caller writes the new state.
+            self._attr_is_unlocking = self._attr_is_locking = False
 
     async def _async_send(self, command_type: str) -> timedelta | None:
         """Send a command over the preferred route, falling back to others."""
@@ -244,14 +262,28 @@ class BoldLock(BoldEntity, LockEntity):
         if keys is None or command is None or ble_device is None:
             raise BoldBluetoothUnavailableError("Not reachable over Bluetooth")
         async with self._bluetooth_lock:
+            # Don't connect while still disconnecting from the last command.
+            if self._disconnecting is not None:
+                await self._disconnecting
+                self._disconnecting = None
             seconds = await async_send_command(
                 ble_device,
                 keys.handshake_key.value,
                 keys.handshake_payload.value,
                 command,
-                timeout,
+                timeout=timeout,
+                disconnect_later=self._disconnect_later,
             )
         return timedelta(seconds=seconds) if seconds else None
+
+    @callback
+    def _disconnect_later(self, disconnect: Coroutine[Any, Any, None]) -> None:
+        """Disconnect in the background, so the result shows straight away."""
+        self._disconnecting = (
+            self.coordinator.config_entry.async_create_background_task(
+                self.hass, disconnect, f"Disconnect from {self.device.name}"
+            )
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

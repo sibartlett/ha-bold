@@ -32,10 +32,11 @@ The protocol is ported from homebridge-bold-ble
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass
+import logging
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
@@ -43,6 +44,8 @@ from .api import BoldError
 
 if TYPE_CHECKING:
     from bleak.backends.device import BLEDevice
+
+_LOGGER = logging.getLogger(__name__)
 
 MANUFACTURER_ID = 0x065B  # Sesam Solutions BV
 SERVICE_UUID = "0000fd30-0000-1000-8000-00805f9b34fb"
@@ -228,12 +231,18 @@ async def async_send_command(
     handshake_key: bytes,
     handshake_payload: bytes,
     command_payload: bytes,
+    *,
     timeout: float,
+    disconnect_later: Callable[[Coroutine[Any, Any, None]], None] | None = None,
 ) -> int:
     """Connect to a lock, and send it a command.
 
     Returns the activation time in seconds. Uses Home Assistant's Bluetooth
     stack, so this works through ESPHome Bluetooth proxies too.
+
+    With disconnect_later, the result is returned as soon as the lock confirms
+    the command, and the disconnect is handed to disconnect_later to run in
+    the background. On errors, the lock is disconnected before raising.
     """
     # Only available when Home Assistant's Bluetooth integration is set up.
     from bleak.exc import BleakError  # noqa: PLC0415
@@ -261,10 +270,27 @@ async def async_send_command(
                     lambda _characteristic, data: session.data_received(bytes(data)),
                 )
                 await session.handshake(handshake_key, handshake_payload)
-                return await session.command(command_payload)
-            finally:
+                result = await session.command(command_payload)
+            except BaseException:
                 await client.disconnect()
+                raise
     except TimeoutError as err:
         raise BoldBluetoothError("Timed out talking to the lock") from err
     except BleakError as err:
         raise BoldBluetoothError(f"Bluetooth error: {err}") from err
+
+    if disconnect_later is None:
+        await _async_disconnect(client)
+    else:
+        disconnect_later(_async_disconnect(client))
+    return result
+
+
+async def _async_disconnect(client: Any) -> None:
+    """Disconnect from a lock, ignoring errors: the command already succeeded."""
+    from bleak.exc import BleakError  # noqa: PLC0415
+
+    try:
+        await client.disconnect()
+    except (BleakError, TimeoutError) as err:
+        _LOGGER.debug("Error disconnecting from a Bold lock: %s", err)
