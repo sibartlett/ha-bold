@@ -137,6 +137,21 @@ async def test_status_without_load_measurement(
     assert hass.states.get(UNDER_LOAD).state == "2.945"
 
 
+async def test_non_numeric_voltage_ignored(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test voltages that aren't numbers are ignored."""
+    status = _status(21, "2026-09-24T12:00:10Z", 3061, 2945, 18)
+    status |= {"voltageIdle": "n/a", "voltageUnderLoad": True, "uptime": None}
+    set_events(mock_api, [status])
+    await _poll(hass, frozen_time)
+    assert hass.states.get(IDLE).state == STATE_UNKNOWN
+    assert hass.states.get(UNDER_LOAD).state == STATE_UNKNOWN
+
+
 async def test_other_events_ignored(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

@@ -116,6 +116,7 @@ async def test_lock_when_not_activated_is_noop(
     [
         ("gatewayNotFoundError", "No Bold Connect"),
         ("TooManyRequests", "Too many requests"),
+        ("DeviceFirmwareOutdated", "Update the lock's firmware"),
         ("Unknown", "command failed"),
     ],
 )
@@ -141,6 +142,24 @@ async def test_unlock_errors(
     with pytest.raises(HomeAssistantError, match=message):
         await _call(hass, SERVICE_UNLOCK)
     assert hass.states.get(ENTITY_ID).state == LockState.LOCKED
+
+
+async def test_unlock_auth_error(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test Bold rejecting the credentials for a command."""
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=[LOCK, GATEWAY])
+    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
+    aioclient_mock.post(f"{API_URL}/v1/devices/{LOCK_ID}/remote-activation", status=401)
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(HomeAssistantError, match="rejected the credentials"):
+        await _call(hass, SERVICE_UNLOCK)
 
 
 async def test_unavailable_without_gateway(

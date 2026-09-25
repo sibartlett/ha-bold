@@ -18,7 +18,11 @@ from pytest_homeassistant_custom_component.common import (
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL, OAUTH2_TOKEN
-from custom_components.bold.const import DEVICE_SCAN_INTERVAL, DOMAIN
+from custom_components.bold.const import (
+    DEVICE_SCAN_INTERVAL,
+    DOMAIN,
+    EVENT_SCAN_INTERVAL,
+)
 
 from .conftest import GATEWAY, LOCK
 
@@ -157,3 +161,21 @@ async def test_foreign_device_removed(
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert device_registry.async_get(foreign.id) is None
+
+
+async def test_event_poll_auth_error_starts_reauth(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test Bold rejecting the credentials while polling events."""
+    mock_api.clear_requests()
+    mock_api.get(f"{API_URL}/v2/devices", json=[LOCK, GATEWAY])
+    mock_api.get(f"{API_URL}/v2/events", status=401)
+    freezer.tick(EVENT_SCAN_INTERVAL)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    flows = hass.config_entries.flow.async_progress()
+    assert [flow["context"]["source"] for flow in flows] == [SOURCE_REAUTH]

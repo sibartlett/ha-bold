@@ -127,6 +127,14 @@ async def test_lock_signal(
     assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
     assert entry.unique_id == f"{LOCK_ID}_connect_signal_strength"
 
+    # Enabled, it shows the signal in dBm.
+    entity_registry.async_update_entity(entry.entity_id, disabled_by=None)
+    await hass.config_entries.async_reload(init_integration.entry_id)
+    await hass.async_block_till_done()
+    state = hass.states.get("sensor.front_door_bold_connect_signal_strength")
+    assert state.state == "-60"
+    assert state.attributes["unit_of_measurement"] == "dBm"
+
 
 async def test_lock_without_connect(
     hass: HomeAssistant,

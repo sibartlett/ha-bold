@@ -9,6 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.core_config import async_process_ha_core_config
+from homeassistant.helpers.config_entry_oauth2_flow import (
+    ImplementationUnavailableError,
+)
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -214,6 +217,13 @@ async def test_cloudhook(
             "https://hooks.nabu.casa/hook"
         )
 
+        # After a restart, the stored cloudhook is reused.
+        await hass.config_entries.async_reload(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+        cloud.async_create_cloudhook.assert_awaited_once()
+        create = _calls(aioclient_mock, "POST", WEBHOOKS)[-1]
+        assert create[2]["webhookUrl"] == "https://hooks.nabu.casa/hook"
+
         # Removing the integration removes the cloudhook and the webhook.
         await hass.config_entries.async_remove(mock_config_entry.entry_id)
         await hass.async_block_till_done()
@@ -307,3 +317,44 @@ async def test_missed_push_polls_faster(
     assert events.push_active
     assert events.update_interval == EVENT_PUSH_SCAN_INTERVAL
     assert timedelta(minutes=5) == EVENT_PUSH_SCAN_INTERVAL
+
+
+async def test_removal_when_bold_fails(
+    hass: HomeAssistant,
+    external_url: str,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test removing the integration when Bold can't delete the webhook."""
+    _mock_bold(aioclient_mock)
+    await _setup(hass, mock_config_entry)
+    aioclient_mock.clear_requests()
+    aioclient_mock.delete(f"{WEBHOOKS}/99", status=500)
+    await hass.config_entries.async_remove(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert "Couldn't delete Bold's webhook" in caplog.text
+
+
+async def test_removal_without_sign_in(
+    hass: HomeAssistant,
+    external_url: str,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test removing the integration when it can't sign in to Bold.
+
+    For example when Home Assistant Cloud isn't connected.
+    """
+    _mock_bold(aioclient_mock)
+    await _setup(hass, mock_config_entry)
+    aioclient_mock.clear_requests()
+    with patch(
+        "custom_components.bold.async_get_config_entry_implementation",
+        side_effect=ImplementationUnavailableError,
+    ):
+        await hass.config_entries.async_remove(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+    assert not aioclient_mock.mock_calls

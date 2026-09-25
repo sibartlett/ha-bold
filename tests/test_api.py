@@ -288,6 +288,11 @@ async def test_connection_error(
             f"/v1/devices/{LOCK_ID}/remote-activation",
             lambda client: client.remote_activation(LOCK_ID),
         ),
+        (
+            "post",
+            "/v3/webhooks",
+            lambda client: client.create_webhook(7, "https://example.com", [], "s"),
+        ),
     ],
 )
 async def test_unexpected_responses(

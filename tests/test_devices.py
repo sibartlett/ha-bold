@@ -174,3 +174,38 @@ async def test_remove_stale_device(
     )
     assert await remove(stale)
     assert device_registry.async_get(stale.id) is None
+
+
+async def test_clicker_ignored(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    device_registry: dr.DeviceRegistry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test devices other than locks and Bold Connects get no entities."""
+    clicker = {
+        **copy.deepcopy(GATEWAY),
+        "id": 9,
+        "name": "Key fob",
+        "model": {
+            "id": 7,
+            "name": "CLICKER",
+            "type": {"id": 3, "name": "Clicker", "description": "Clicker"},
+        },
+    }
+    _mock_api(aioclient_mock, [LOCK, GATEWAY, clicker], [])
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert _device(device_registry, mock_config_entry, 9) is None
+    assert not [
+        entry
+        for entry in er.async_entries_for_config_entry(
+            entity_registry, mock_config_entry.entry_id
+        )
+        if entry.unique_id.startswith("9_") or entry.unique_id == "9"
+    ]
+    assert _device(device_registry, mock_config_entry, LOCK_ID) is not None

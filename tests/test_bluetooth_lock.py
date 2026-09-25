@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.lock import (
+    DATA_COMPONENT as LOCK_COMPONENT,
     DOMAIN as LOCK_DOMAIN,
     SERVICE_LOCK,
     SERVICE_UNLOCK,
@@ -34,9 +36,11 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
 
+from custom_components.bold.boldsmartlock import COMMAND_ACTIVATE, COMMAND_DEACTIVATE
 from custom_components.bold.boldsmartlock.ble import BoldBluetoothError
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import DEVICE_SCAN_INTERVAL
+from custom_components.bold.keys import BoldLockKeys, BoldSecret
 
 from .conftest import (
     ACTIVATE_COMMAND,
@@ -223,6 +227,32 @@ async def test_bluetooth_only(
     init_integration.runtime_data.bluetooth.async_mark_unreachable(LOCK_ID)
     await hass.async_block_till_done()
     assert hass.states.get(LOCK_ENTITY).state == STATE_UNAVAILABLE
+
+
+async def test_bluetooth_lost_before_sending(
+    hass: HomeAssistant,
+    fake_bluetooth: FakeBluetooth,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Test the lock going out of range just as a command is sent."""
+    await _set_method(hass, "bluetooth_only")
+    fake_bluetooth.ble_device = None
+    with pytest.raises(HomeAssistantError, match="can't be reached over Bluetooth"):
+        await _call(hass, SERVICE_UNLOCK)
+    assert fake_bluetooth.sent == []
+
+
+async def test_no_route_left(
+    hass: HomeAssistant,
+    fake_bluetooth: FakeBluetooth,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Test unlocking a lock that became unreachable since it was last shown."""
+    await _set_method(hass, "bluetooth_only")
+    entity = hass.data[LOCK_COMPONENT].get_entity(LOCK_ENTITY)
+    init_integration.runtime_data.bluetooth.async_mark_unreachable(LOCK_ID)
+    with pytest.raises(HomeAssistantError, match="can't be reached through"):
+        await entity.async_unlock()
 
 
 async def test_out_of_range_uses_connect(
@@ -474,3 +504,17 @@ async def test_failed_unlock_stops_unlocking(
     with pytest.raises(HomeAssistantError):
         await _call(hass, SERVICE_UNLOCK)
     assert states == [LockState.UNLOCKING, LockState.LOCKED]
+
+
+def test_expired_keys_unused() -> None:
+    """Test commands aren't used once they, or the handshake, expire."""
+    now = datetime(2026, 9, 24, 12, tzinfo=UTC)
+    later = now + timedelta(hours=1)
+    valid = BoldSecret(b"secret", later)
+    expired = BoldSecret(b"secret", now)
+    keys = BoldLockKeys(valid, valid, {COMMAND_ACTIVATE: valid})
+    assert keys.command(COMMAND_ACTIVATE, now) == b"secret"
+    assert keys.command(COMMAND_ACTIVATE, later) is None
+    assert keys.command(COMMAND_DEACTIVATE, now) is None
+    keys = BoldLockKeys(valid, expired, {COMMAND_ACTIVATE: valid})
+    assert keys.command(COMMAND_ACTIVATE, now) is None
