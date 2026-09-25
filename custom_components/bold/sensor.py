@@ -14,8 +14,9 @@ from homeassistant.const import SIGNAL_STRENGTH_DECIBELS_MILLIWATT, EntityCatego
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .api import BoldDevice
 from .coordinator import BoldConfigEntry
-from .entity import BoldEntity
+from .entity import BoldEntity, async_add_device_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,8 +33,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bold sensors."""
     coordinator = entry.runtime_data.devices
-    entities: list[SensorEntity] = []
-    for device in coordinator.data.values():
+
+    def create_entities(device: BoldDevice) -> list[SensorEntity]:
+        entities: list[SensorEntity] = []
         if device.is_lock:
             entities.append(
                 BoldBatteryLevelSensor(coordinator, device, "battery_level")
@@ -49,7 +51,9 @@ async def async_setup_entry(
                 )
         elif device.is_gateway:
             entities.append(BoldLastSeenSensor(coordinator, device, "last_seen"))
-    async_add_entities(entities)
+        return entities
+
+    async_add_device_entities(entry, async_add_entities, create_entities)
 
 
 def _level(level: str | None, what: str, device_name: str) -> str | None:

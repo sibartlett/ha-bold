@@ -27,7 +27,7 @@ from .api import (
 )
 from .const import DEFAULT_ACTIVATION_TIME, DOMAIN
 from .coordinator import BoldConfigEntry, BoldDeviceCoordinator, BoldEventCoordinator
-from .entity import BoldEntity
+from .entity import BoldEntity, async_add_device_entities
 
 PARALLEL_UPDATES = 1
 
@@ -39,10 +39,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bold locks."""
     data = entry.runtime_data
-    async_add_entities(
-        BoldLock(data.devices, data.events, device)
-        for device in data.devices.data.values()
-        if device.is_lock and device.remote_access
+    async_add_device_entities(
+        entry,
+        async_add_entities,
+        lambda device: (
+            [BoldLock(data.devices, data.events, device)]
+            if device.is_lock and device.remote_access
+            else []
+        ),
     )
 
 
@@ -74,7 +78,7 @@ class BoldLock(BoldEntity, LockEntity):
     def __init__(
         self,
         coordinator: BoldDeviceCoordinator,
-        events: BoldEventCoordinator | None,
+        events: BoldEventCoordinator,
         device: BoldDevice,
     ) -> None:
         """Initialize the lock."""
@@ -88,10 +92,9 @@ class BoldLock(BoldEntity, LockEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe to events and schedule the end of any activation."""
         await super().async_added_to_hass()
-        if self._events is not None:
-            self.async_on_remove(
-                self._events.async_add_listener(self._handle_events_update)
-            )
+        self.async_on_remove(
+            self._events.async_add_listener(self._handle_events_update)
+        )
         self.async_on_remove(self._cancel_expiry)
         self._schedule_expiry()
 
@@ -156,7 +159,6 @@ class BoldLock(BoldEntity, LockEntity):
     @callback
     def _handle_events_update(self) -> None:
         """Apply activation events from the event log."""
-        assert self._events is not None
         changed = False
         for event in self._events.data or []:
             if event.device_id != self.device_id:

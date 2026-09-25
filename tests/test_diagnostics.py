@@ -19,5 +19,5 @@ async def test_diagnostics(
         "Front Door",
         "Bold Connect",
     ]
-    assert diagnostics["event_log_enabled"] is True
+    assert diagnostics["event_log_devices"] == [1]
     assert diagnostics["recent_events"] == []

@@ -67,7 +67,7 @@ async def test_setup_without_event_log(
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert mock_config_entry.runtime_data.events is None
+    assert mock_config_entry.runtime_data.events.device_ids == []
     assert hass.states.get("lock.front_door") is not None
     assert hass.states.get("event.front_door_activity") is None
     assert not any("/v2/events" in str(call[1]) for call in aioclient_mock.mock_calls)

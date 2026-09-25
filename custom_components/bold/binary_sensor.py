@@ -11,9 +11,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
+from .api import BoldDevice
 from .const import CONNECT_OFFLINE_AFTER
 from .coordinator import BoldConfigEntry
-from .entity import BoldEntity
+from .entity import BoldEntity, async_add_device_entities
 
 PARALLEL_UPDATES = 0
 
@@ -27,13 +28,15 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bold binary sensors."""
     coordinator = entry.runtime_data.devices
-    entities: list[BinarySensorEntity] = []
-    for device in coordinator.data.values():
+
+    def create_entities(device: BoldDevice) -> list[BinarySensorEntity]:
         if device.is_lock:
-            entities.append(BoldBatteryLowSensor(coordinator, device, "battery"))
-        elif device.is_gateway:
-            entities.append(BoldConnectOnlineSensor(coordinator, device, "online"))
-    async_add_entities(entities)
+            return [BoldBatteryLowSensor(coordinator, device, "battery")]
+        if device.is_gateway:
+            return [BoldConnectOnlineSensor(coordinator, device, "online")]
+        return []
+
+    async_add_device_entities(entry, async_add_entities, create_entities)
 
 
 class BoldBatteryLowSensor(BoldEntity, BinarySensorEntity):

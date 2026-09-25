@@ -37,7 +37,7 @@ class BoldRuntimeData:
 
     client: BoldClient
     devices: BoldDeviceCoordinator
-    events: BoldEventCoordinator | None
+    events: BoldEventCoordinator
 
 
 class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):
@@ -81,8 +81,9 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
     """Polls the event log of a set of Bold devices.
 
     The data is the list of events that are new since the previous poll,
-    oldest first. The first poll only records which events already exist,
-    so history is not replayed when Home Assistant starts.
+    oldest first. A device's first poll only records which of its events
+    already exist, so history is not replayed when Home Assistant starts or
+    a lock is added. The device list is kept up to date by the integration.
     """
 
     config_entry: BoldConfigEntry
@@ -108,14 +109,17 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         self.recent_events: deque[BoldEvent] = deque(maxlen=RECENT_EVENTS)
         self._cursor: datetime | None = None
         self._seen: dict[int, datetime] = {}
+        self._primed: set[int] = set()
 
     async def _async_update_data(self) -> list[BoldEvent]:
         """Fetch events since the last poll."""
-        first_poll = self._cursor is None
         cursor = self._cursor or dt_util.utcnow()
+        if not (device_ids := list(self.device_ids)):
+            self._cursor = cursor
+            return []
         try:
             events = await self.client.get_events(
-                self.device_ids, cursor - EVENT_POLL_OVERLAP
+                device_ids, cursor - EVENT_POLL_OVERLAP
             )
         except BoldAuthError as err:
             raise ConfigEntryAuthFailed(
@@ -151,6 +155,5 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
             event_id: time for event_id, time in self._seen.items() if time >= horizon
         }
 
-        if first_poll:
-            return []
-        return new_events
+        primed, self._primed = self._primed, set(device_ids)
+        return [event for event in new_events if event.device_id in primed]

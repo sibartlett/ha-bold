@@ -9,7 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import BoldDevice, BoldEvent
 from .coordinator import BoldConfigEntry, BoldEventCoordinator
-from .entity import device_info
+from .entity import async_add_device_entities, device_info
 
 PARALLEL_UPDATES = 0
 
@@ -31,12 +31,15 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Bold activity events."""
-    data = entry.runtime_data
-    if data.events is None:
-        return
-    async_add_entities(
-        BoldActivityEvent(data.events, data.devices.data[device_id])
-        for device_id in data.events.device_ids
+    events = entry.runtime_data.events
+    async_add_device_entities(
+        entry,
+        async_add_entities,
+        lambda device: (
+            [BoldActivityEvent(events, device)]
+            if device.is_lock and device.event_log
+            else []
+        ),
     )
 
 

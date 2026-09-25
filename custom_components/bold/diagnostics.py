@@ -34,12 +34,8 @@ async def async_get_config_entry_diagnostics(
         "devices": async_redact_data(
             [device.raw for device in data.devices.data.values()], TO_REDACT
         ),
-        "event_log_enabled": data.events is not None,
-        "recent_events": (
-            async_redact_data(
-                [event.raw for event in data.events.recent_events], TO_REDACT
-            )
-            if data.events is not None
-            else []
+        "event_log_devices": data.events.device_ids,
+        "recent_events": async_redact_data(
+            [event.raw for event in data.events.recent_events], TO_REDACT
         ),
     }

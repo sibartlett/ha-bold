@@ -2,12 +2,44 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
+
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import BoldDevice
 from .const import DOMAIN, MANUFACTURER
-from .coordinator import BoldDeviceCoordinator
+from .coordinator import BoldConfigEntry, BoldDeviceCoordinator
+
+
+@callback
+def async_add_device_entities(
+    entry: BoldConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+    create_entities: Callable[[BoldDevice], Iterable[Entity]],
+) -> None:
+    """Add entities for each device, including devices added to Bold later."""
+    coordinator = entry.runtime_data.devices
+    known: set[int] = set()
+
+    @callback
+    def add_new_devices() -> None:
+        # Forget removed devices, so they get entities again if they return.
+        known.intersection_update(coordinator.data)
+        new_devices = [
+            device for device in coordinator.data.values() if device.id not in known
+        ]
+        known.update(device.id for device in new_devices)
+        if entities := [
+            entity for device in new_devices for entity in create_entities(device)
+        ]:
+            async_add_entities(entities)
+
+    add_new_devices()
+    entry.async_on_unload(coordinator.async_add_listener(add_new_devices))
 
 
 def device_info(device: BoldDevice, via_device_id: str | None = None) -> DeviceInfo:

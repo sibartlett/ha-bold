@@ -26,6 +26,9 @@ Each Bold Connect is a device too, and the locks it serves are linked to it:
 Locks without a Bold Connect show as unavailable, because they can't be
 activated remotely.
 
+Locks and Bold Connects added to your Bold account appear automatically at the
+next device poll, and ones removed from it are removed from Home Assistant.
+
 ## Polling
 
 Bold's webhooks are only available to business organizations, so this
