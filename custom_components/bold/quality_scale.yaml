@@ -6,8 +6,10 @@ rules:
   appropriate-polling:
     status: done
     comment: |
-      Devices are polled every 10 minutes. The event log is polled every 30
-      seconds, because Bold only offers webhooks to business organizations.
+      Bold pushes events to a webhook when Home Assistant is reachable from
+      the internet; the event log is then polled every 5 minutes as a safety
+      net. Without pushes it's polled every 30 seconds. Devices are polled
+      every 10 minutes.
   brands: done
   common-modules: done
   config-flow: done

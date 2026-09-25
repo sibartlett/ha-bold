@@ -47,6 +47,11 @@ Signing in needs one of:
 
 There are no other settings. Each Bold account can be added once.
 
+For activity to appear within seconds, Bold needs to reach Home Assistant from
+the internet: set an external URL (**Settings → System → Network**), or use
+Home Assistant Cloud. Without that, activity is polled instead (see
+[How data is updated](#how-data-is-updated)).
+
 If Home Assistant can hear a Bold lock over Bluetooth, or sees a Bold Connect
 join your network, it offers to set up Bold under
 **Settings → Devices & services → Discovered**.
@@ -226,9 +231,14 @@ of the time; it's raised again if the problem comes back after being fixed.
 - **A lock has no activity entity.** The lock doesn't support Bold's event log.
   If the log says the account "is not allowed to read the event log", your Bold
   account doesn't have access to it.
-- **The lock shows locked, but someone just opened it.** Activity from outside
-  Home Assistant takes up to 30 seconds to appear, and the lock only shows as
-  unlocked while it is activated (usually a few seconds).
+- **Activity takes up to 30 seconds to appear.** Bold isn't pushing it. Home
+  Assistant needs an external URL Bold can reach, or Home Assistant Cloud. The
+  integration's diagnostics show whether pushes are active, and when the last
+  one arrived; debug logging shows why the webhook couldn't be set up. After changing the external URL, reload the
+  integration so the webhook points at the new address.
+- **The lock shows locked, but someone just opened it.** Locks that don't
+  report their bolt position only show as unlocked while activated (usually a
+  few seconds), which can be over before the activity arrives.
 - **Home Assistant asks to re-authenticate.** Your Bold sign-in expired or was
   revoked. Follow the prompt and sign in with the same Bold account.
 
@@ -240,7 +250,8 @@ disable it to download the log). Personal details are removed from diagnostics.
 ## Removal
 
 1. Go to **Settings → Devices & services → Bold Smart Lock**, open the **⋮**
-   menu and choose **Delete**.
+   menu and choose **Delete**. This also removes the webhook the integration
+   registered with Bold.
 2. To remove the integration's files too, remove **Bold Smart Lock** in HACS and
    restart Home Assistant.
    This also deletes the Bluetooth keys stored for your locks.
