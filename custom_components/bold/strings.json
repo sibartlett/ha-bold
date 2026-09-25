@@ -1,0 +1,72 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "[%key:common::config_flow::title::oauth2_pick_implementation%]"
+      },
+      "reauth_confirm": {
+        "title": "[%key:common::config_flow::title::reauth%]",
+        "description": "The Bold integration needs to re-authenticate your account."
+      }
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_account%]",
+      "already_in_progress": "[%key:common::config_flow::abort::already_in_progress%]",
+      "authorize_url_timeout": "[%key:common::config_flow::abort::oauth2_authorize_url_timeout%]",
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "missing_configuration": "[%key:common::config_flow::abort::oauth2_missing_configuration%]",
+      "missing_credentials": "[%key:common::config_flow::abort::oauth2_missing_credentials%]",
+      "no_url_available": "[%key:common::config_flow::abort::oauth2_no_url_available%]",
+      "oauth_error": "[%key:common::config_flow::abort::oauth2_error%]",
+      "oauth_failed": "[%key:common::config_flow::abort::oauth2_failed%]",
+      "oauth_timeout": "[%key:common::config_flow::abort::oauth2_timeout%]",
+      "oauth_unauthorized": "[%key:common::config_flow::abort::oauth2_unauthorized%]",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
+      "user_rejected_authorize": "[%key:common::config_flow::abort::oauth2_user_rejected_authorize%]",
+      "wrong_account": "You signed in with a different Bold account than the one this entry was set up with."
+    },
+    "create_entry": {
+      "default": "[%key:common::config_flow::create_entry::authenticated%]"
+    }
+  },
+  "entity": {
+    "event": {
+      "activity": {
+        "name": "Activity",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "activated": "Activated",
+              "activation_failed": "Activation failed",
+              "deactivated": "Deactivated",
+              "tamper": "Tamper alert"
+            }
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "Bold rejected the credentials. Re-authenticate the integration."
+    },
+    "command_failed": {
+      "message": "The Bold lock command failed: {error}"
+    },
+    "firmware_outdated": {
+      "message": "Update the lock's firmware in the Bold app to end activations remotely."
+    },
+    "gateway_not_found": {
+      "message": "No Bold Connect is available to reach this lock."
+    },
+    "oauth2_implementation_unavailable": {
+      "message": "The Bold application credentials are not available."
+    },
+    "rate_limited": {
+      "message": "Too many requests were sent to Bold. Try again later."
+    },
+    "update_failed": {
+      "message": "Error communicating with the Bold API: {error}"
+    }
+  }
+}

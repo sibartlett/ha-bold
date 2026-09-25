@@ -1,0 +1,13 @@
+{
+  "domain": "bold",
+  "name": "Bold Smart Lock",
+  "codeowners": ["@sibartlett"],
+  "config_flow": true,
+  "dependencies": ["application_credentials"],
+  "documentation": "https://github.com/sibartlett/hass-bold",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/sibartlett/hass-bold/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
