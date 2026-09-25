@@ -88,7 +88,6 @@ class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
             ):
                 continue
             attributes: dict[str, str | int | bool | None] = {
-                "bold_event_id": event.id,
                 "time": event.time.isoformat(),
                 "user": event.user_name,
             }

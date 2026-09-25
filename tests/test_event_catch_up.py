@@ -123,13 +123,17 @@ async def test_late_event_caught_up(
     event_log.add(3, START + timedelta(minutes=1), START + timedelta(minutes=5))
 
     await _run_until(hass, freezer, START + timedelta(minutes=9))
-    assert hass.states.get(ENTITY_ID).attributes["bold_event_id"] == 2
+    assert (
+        hass.states.get(ENTITY_ID).attributes["time"]
+        == (START + timedelta(minutes=4)).isoformat()
+    )
 
     await _run_until(hass, freezer, START + timedelta(minutes=10, seconds=30))
-    state = hass.states.get(ENTITY_ID)
-    assert state.attributes["bold_event_id"] == 3
-    # It still says when it actually happened.
-    assert state.attributes["time"] == (START + timedelta(minutes=1)).isoformat()
+    # It fires, and says when it actually happened.
+    assert (
+        hass.states.get(ENTITY_ID).attributes["time"]
+        == (START + timedelta(minutes=1)).isoformat()
+    )
 
 
 async def test_history_not_replayed(

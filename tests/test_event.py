@@ -81,7 +81,9 @@ async def test_activation_event(
     assert state.attributes["method"] == "Pin"
     assert state.attributes["result"] == "Success"
     assert state.attributes["remote"] is False
-    assert state.attributes["bold_event_id"] == 10
+    assert state.attributes["time"] == "2026-09-24T12:00:10+00:00"
+    # Pushed events have no ID, so none is exposed.
+    assert "bold_event_id" not in state.attributes
 
     # The same event is returned by the next poll, but must not fire again.
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)

@@ -99,7 +99,7 @@ async def test_lock_added(
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     state = hass.states.get("event.garage_activity")
     assert state.attributes["event_type"] == "activated"
-    assert state.attributes["bold_event_id"] == 51
+    assert state.attributes["time"] == "2026-09-24T12:10:20+00:00"
 
 
 async def test_lock_removed(
