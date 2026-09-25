@@ -180,3 +180,53 @@ async def test_no_voltage_without_event_log(
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     assert hass.states.get(IDLE) is None
+
+
+async def test_voltage_from_history(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test sensors start from the latest reading of the past week.
+
+    Locks only report voltages when they're turned, which can be days ago.
+    """
+    older = {**DEBUG_EVENT, "id": 30, "time": "2026-09-20T08:00:00Z"}
+    older["body"] = {**DEBUG_EVENT["body"], "voltageIdle": 3100, "voltage3": 2700}
+    newer = {**DEBUG_EVENT, "id": 31, "time": "2026-09-22T08:00:00Z"}
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=[LOCK, GATEWAY])
+    aioclient_mock.get(
+        f"{API_URL}/v2/events",
+        params={"type": "DeviceStatus DeviceDebug"},
+        json=[newer, older],
+    )
+    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(IDLE).state == "3.063"
+    assert hass.states.get(UNDER_LOAD).state == "2.682"
+    history_call = next(
+        call for call in aioclient_mock.mock_calls if "type" in call[1].query
+    )
+    assert history_call[1].query["from"].startswith("2026-09-17T12:00:00")
+
+
+async def test_voltage_history_unavailable(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test setup carries on when the history can't be fetched."""
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=[LOCK, GATEWAY])
+    aioclient_mock.get(
+        f"{API_URL}/v2/events", params={"type": "DeviceStatus DeviceDebug"}, status=500
+    )
+    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(IDLE).state == STATE_UNKNOWN

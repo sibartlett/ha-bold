@@ -253,7 +253,12 @@ class BoldBatteryVoltageSensor(CoordinatorEntity[BoldEventCoordinator], RestoreS
         await super().async_added_to_hass()
         if (last := await self.async_get_last_sensor_data()) is not None:
             self._attr_native_value = last.native_value
-        self._update_from(self.coordinator.recent_events)
+        self._update_from(
+            sorted(
+                [*self.coordinator.status_history, *self.coordinator.recent_events],
+                key=lambda event: (event.time, event.id),
+            )
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

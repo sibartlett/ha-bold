@@ -21,6 +21,10 @@ EVENT_POLL_OVERLAP: Final = timedelta(minutes=2)
 # ago. It checks in every few minutes, and devices are polled every 10.
 CONNECT_OFFLINE_AFTER: Final = timedelta(minutes=30)
 
+# Locks only report their battery voltage when they're turned, so at startup
+# the latest reading from this far back is used.
+BATTERY_VOLTAGE_HISTORY: Final = timedelta(days=7)
+
 # Bluetooth keys: handshakes last about a week, and are refreshed well before.
 BLUETOOTH_KEYS_REFRESH_INTERVAL: Final = timedelta(hours=12)
 # How long to try Bluetooth before falling back to the Bold Connect, and how

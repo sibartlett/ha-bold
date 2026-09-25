@@ -325,21 +325,24 @@ class BoldClient:
             offset += PAGE_SIZE
 
     async def get_events(
-        self, device_ids: list[int], since: datetime
+        self,
+        device_ids: list[int],
+        since: datetime,
+        event_types: list[str] | None = None,
     ) -> list[BoldEvent]:
         """Return events for the given devices since a point in time."""
         events: list[BoldEvent] = []
         offset = 0
+        params: dict[str, Any] = {
+            "deviceId": " ".join(str(device_id) for device_id in device_ids),
+            "from": since.isoformat(),
+            "size": PAGE_SIZE,
+        }
+        if event_types:
+            params["type"] = " ".join(event_types)
         while True:
             page = await self._request(
-                "GET",
-                "/v2/events",
-                {
-                    "deviceId": " ".join(str(device_id) for device_id in device_ids),
-                    "from": since.isoformat(),
-                    "offset": offset,
-                    "size": PAGE_SIZE,
-                },
+                "GET", "/v2/events", {**params, "offset": offset}
             )
             if not isinstance(page, list):
                 raise BoldError("Unexpected response from GET /v2/events")

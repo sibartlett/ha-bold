@@ -113,9 +113,24 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         self.client = client
         self.device_ids = device_ids
         self.recent_events: deque[BoldEvent] = deque(maxlen=RECENT_EVENTS)
+        # Status and debug events from before startup, which carry voltages.
+        self.status_history: list[BoldEvent] = []
         self._cursor: datetime | None = None
         self._seen: dict[int, datetime] = {}
         self._primed: set[int] = set()
+
+    async def async_load_status_history(self, since: datetime) -> None:
+        """Fetch recent status and debug events, e.g. for battery voltages."""
+        if not self.device_ids:
+            return
+        try:
+            events = await self.client.get_events(
+                self.device_ids, since, ["DeviceStatus", "DeviceDebug"]
+            )
+        except BoldError as err:
+            _LOGGER.debug("Couldn't fetch recent status events: %s", err)
+            return
+        self.status_history = sorted(events, key=lambda event: (event.time, event.id))
 
     async def _async_update_data(self) -> list[BoldEvent]:
         """Fetch events since the last poll."""

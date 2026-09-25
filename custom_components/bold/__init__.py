@@ -16,9 +16,10 @@ from homeassistant.helpers.config_entry_oauth2_flow import (
     async_get_config_entry_implementation,
 )
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from .api import BoldClient
-from .const import BLUETOOTH_KEYS_REFRESH_INTERVAL, DOMAIN
+from .const import BATTERY_VOLTAGE_HISTORY, BLUETOOTH_KEYS_REFRESH_INTERVAL, DOMAIN
 from .coordinator import (
     BoldConfigEntry,
     BoldDeviceCoordinator,
@@ -81,6 +82,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
     )
 
     await events.async_config_entry_first_refresh()
+    await events.async_load_status_history(dt_util.utcnow() - BATTERY_VOLTAGE_HISTORY)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _async_setup_bluetooth(hass, entry)
     return True

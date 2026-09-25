@@ -63,7 +63,7 @@ Each lock gets:
 | `event.<lock>_activity` | Fires for activations (with the user and method: PIN, button, app…), failed activations such as a wrong PIN, deactivations, and tamper alerts. |
 | `sensor.<lock>_battery_level` | Battery level as Bold reports it: Excellent, High, Medium, Low or Critical. |
 | `binary_sensor.<lock>_battery` | Low battery: on when the level is Low or Critical. |
-| `sensor.<lock>_battery_voltage` | Battery voltage at rest. Locks report it when they're used, so it updates with activity, and keeps its last reading across restarts. |
+| `sensor.<lock>_battery_voltage` | Battery voltage at rest. Locks report it when they're turned (not on every activation), so it starts from the latest reading of the past week, and keeps its last reading across restarts. |
 | `sensor.<lock>_battery_voltage_under_load` | The lowest battery voltage while the motor runs. Weak batteries sag under load before they drop at rest, so this is the earlier warning. |
 | `sensor.<lock>_bold_connect_signal` | How well the lock reaches its Bold Connect: Excellent, High, Medium, Low or Critical. |
 | `sensor.<lock>_bold_connect_signal_strength` | The same signal in dBm. Disabled by default. |
