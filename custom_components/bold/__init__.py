@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import Any
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
@@ -14,9 +15,10 @@ from homeassistant.helpers.config_entry_oauth2_flow import (
     OAuth2Session,
     async_get_config_entry_implementation,
 )
+from homeassistant.helpers.event import async_track_time_interval
 
 from .api import BoldClient
-from .const import DOMAIN
+from .const import BLUETOOTH_KEYS_REFRESH_INTERVAL, DOMAIN
 from .coordinator import (
     BoldConfigEntry,
     BoldDeviceCoordinator,
@@ -24,11 +26,15 @@ from .coordinator import (
     BoldRuntimeData,
 )
 from .entity import device_info
+from .keys import BoldBluetoothKeys
+from .tracker import BoldBluetoothTracker
+from .unlock import BoldUnlockMethods
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.EVENT,
     Platform.LOCK,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.UPDATE,
 ]
@@ -56,7 +62,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
     devices = BoldDeviceCoordinator(hass, entry, client)
     await devices.async_config_entry_first_refresh()
     events = BoldEventCoordinator(hass, entry, client, [])
-    entry.runtime_data = BoldRuntimeData(client=client, devices=devices, events=events)
+    bluetooth_keys = BoldBluetoothKeys(hass, entry.entry_id, client)
+    await bluetooth_keys.async_load()
+    entry.runtime_data = BoldRuntimeData(
+        client=client,
+        devices=devices,
+        events=events,
+        bluetooth_keys=bluetooth_keys,
+        bluetooth=BoldBluetoothTracker(hass),
+        unlock_methods=BoldUnlockMethods(),
+    )
 
     # Registered before the platforms, so it runs before they add entities for
     # new devices.
@@ -67,7 +82,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
 
     await events.async_config_entry_first_refresh()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _async_setup_bluetooth(hass, entry)
     return True
+
+
+@callback
+def _async_setup_bluetooth(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
+    """Follow locks over Bluetooth, and keep their Bluetooth keys fresh."""
+    data = entry.runtime_data
+    data.bluetooth.async_start(entry)
+    if not data.bluetooth.enabled:
+        return
+
+    @callback
+    def refresh_keys(*_: Any) -> None:
+        entry.async_create_background_task(
+            hass,
+            data.bluetooth_keys.async_refresh(
+                [device.id for device in data.devices.data.values() if device.is_lock]
+            ),
+            "Refresh Bold Bluetooth keys",
+        )
+
+    refresh_keys()
+    entry.async_on_unload(
+        async_track_time_interval(hass, refresh_keys, BLUETOOTH_KEYS_REFRESH_INTERVAL)
+    )
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
+    """Delete the stored Bluetooth keys when Bold is removed."""
+    await BoldBluetoothKeys.async_remove_stored(hass, entry.entry_id)
 
 
 @callback

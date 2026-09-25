@@ -15,6 +15,17 @@
         }
       }
     },
+    "select": {
+      "unlock_method": {
+        "default": "mdi:key-wireless",
+        "state": {
+          "prefer_bluetooth": "mdi:bluetooth",
+          "prefer_connect": "mdi:cloud-lock",
+          "bluetooth_only": "mdi:bluetooth-connect",
+          "connect_only": "mdi:cloud-lock-outline"
+        }
+      }
+    },
     "sensor": {
       "battery_level": {
         "default": "mdi:battery",

@@ -1,6 +1,9 @@
 {
   "domain": "bold",
   "name": "Bold Smart Lock",
+  "after_dependencies": [
+    "bluetooth"
+  ],
   "bluetooth": [
     {
       "manufacturer_id": 1627,

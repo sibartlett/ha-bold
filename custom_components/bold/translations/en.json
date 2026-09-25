@@ -49,6 +49,17 @@
         }
       }
     },
+    "select": {
+      "unlock_method": {
+        "name": "Unlock method",
+        "state": {
+          "prefer_bluetooth": "Prefer Bluetooth",
+          "prefer_connect": "Prefer Bold Connect",
+          "bluetooth_only": "Bluetooth only",
+          "connect_only": "Bold Connect only"
+        }
+      }
+    },
     "sensor": {
       "battery_level": {
         "name": "Battery level",
@@ -82,6 +93,12 @@
     "auth_failed": {
       "message": "Bold rejected the credentials. Re-authenticate the integration."
     },
+    "bluetooth_failed": {
+      "message": "Unlocking over Bluetooth failed: {error}"
+    },
+    "bluetooth_unavailable": {
+      "message": "The lock can't be reached over Bluetooth."
+    },
     "command_failed": {
       "message": "The Bold lock command failed: {error}"
     },
@@ -96,6 +113,9 @@
     },
     "rate_limited": {
       "message": "Too many requests were sent to Bold. Try again later."
+    },
+    "unreachable": {
+      "message": "{name} can't be reached through a Bold Connect or over Bluetooth."
     },
     "update_failed": {
       "message": "Error communicating with the Bold API: {error}"

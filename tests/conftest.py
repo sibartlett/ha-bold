@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Generator
 import copy
 import time
@@ -19,6 +20,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.const import API_URL, DOMAIN
+from custom_components.bold.tracker import BoldBluetoothTracker
 
 CLIENT_ID = "client-id"
 CLIENT_SECRET = "client-secret"
@@ -143,7 +145,7 @@ def mock_api(
 @pytest.fixture
 def platforms() -> list[str]:
     """Platforms to set up; override in a test module to limit them."""
-    return ["binary_sensor", "event", "lock", "sensor", "update"]
+    return ["binary_sensor", "event", "lock", "select", "sensor", "update"]
 
 
 @pytest.fixture
@@ -192,3 +194,98 @@ def mock_setup_entry() -> Generator[None]:
     """Prevent the integration from being set up during config flow tests."""
     with patch("custom_components.bold.async_setup_entry", return_value=True):
         yield
+
+
+HANDSHAKE_KEY = b"k" * 16
+HANDSHAKE_PAYLOAD = b"h" * 62
+ACTIVATE_COMMAND = b"a" * 51
+DEACTIVATE_COMMAND = b"d" * 51
+KEYS_EXPIRE = "2099-01-01T00:00:00Z"
+
+
+def _b64(data: bytes) -> str:
+    return base64.b64encode(data).decode()
+
+
+def mock_bluetooth_keys(aioclient_mock: AiohttpClientMocker) -> None:
+    """Mock Bold's Bluetooth key endpoints for the test lock."""
+    aioclient_mock.get(
+        f"{API_URL}/v2/controller/handshakes",
+        json=[
+            {
+                "deviceId": LOCK_ID,
+                "expiration": KEYS_EXPIRE,
+                "handshakeKey": _b64(HANDSHAKE_KEY),
+                "payload": _b64(HANDSHAKE_PAYLOAD),
+            }
+        ],
+    )
+    aioclient_mock.get(
+        f"{API_URL}/v2/controller/commands",
+        json=[
+            {
+                "deviceId": LOCK_ID,
+                "commandType": "Activate",
+                "expiration": KEYS_EXPIRE,
+                "payload": _b64(ACTIVATE_COMMAND),
+            },
+            {
+                "deviceId": LOCK_ID,
+                "commandType": "Deactivate",
+                "expiration": KEYS_EXPIRE,
+                "payload": _b64(DEACTIVATE_COMMAND),
+            },
+        ],
+    )
+
+
+class FakeBluetooth:
+    """Stands in for Home Assistant's Bluetooth stack and the lock's radio."""
+
+    def __init__(self) -> None:
+        self.reachable: set[int] = {LOCK_ID}
+        self.ble_device = object()
+        self.sent: list[bytes] = []
+        self.error: Exception | None = None
+        self.activation_time = 15
+
+    async def send_command(
+        self,
+        ble_device: object,
+        handshake_key: bytes,
+        handshake_payload: bytes,
+        command: bytes,
+        timeout: float,
+    ) -> int:
+        assert ble_device is self.ble_device
+        assert handshake_key == HANDSHAKE_KEY
+        assert handshake_payload == HANDSHAKE_PAYLOAD
+        if self.error:
+            raise self.error
+        self.sent.append(command)
+        return self.activation_time
+
+
+@pytest.fixture
+def fake_bluetooth(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> Generator[FakeBluetooth]:
+    """Give Home Assistant Bluetooth, with the test lock in range."""
+    fake = FakeBluetooth()
+    hass.config.components.add("bluetooth")
+    mock_bluetooth_keys(aioclient_mock)
+
+    def start(self: BoldBluetoothTracker, entry: object) -> None:
+        for device_id in fake.reachable:
+            self._reachable.add(device_id)  # noqa: SLF001
+
+    with (
+        patch.object(BoldBluetoothTracker, "async_start", start),
+        patch.object(
+            BoldBluetoothTracker,
+            "ble_device",
+            lambda self, device_id: fake.ble_device,
+        ),
+        patch("custom_components.bold.lock.async_send_command", fake.send_command),
+    ):
+        yield fake

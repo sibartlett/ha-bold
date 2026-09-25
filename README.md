@@ -14,11 +14,17 @@ firmware.
 | Device | Support |
 |---|---|
 | Bold Smart Cylinder | ✅ Tested with the Bold Classic (SX33); other cylinder models should work the same way. |
-| Bold Connect | ✅ Needed to unlock locks remotely. |
+| Bold Connect | ✅ Unlocks locks from anywhere, through Bold's cloud. |
 | Bold Clicker (key fob) | ➖ Ignored. Its activity shows up on the lock it opens. |
 
-Remote unlocking needs a Bold Connect within range of the lock, and permission
-to use the lock remotely in your Bold account.
+Home Assistant can unlock a lock in two ways:
+
+- **Through a Bold Connect** near the lock, via Bold's cloud.
+- **Over Bluetooth**, directly, when Home Assistant can hear the lock: through
+  its own Bluetooth adapter, or an
+  [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html)
+  near the door. This is faster, works when the internet is down, and works for
+  locks without a Bold Connect.
 
 ## Installation
 
@@ -60,6 +66,7 @@ Each lock gets:
 | `sensor.<lock>_bold_connect_signal` | How well the lock reaches its Bold Connect: Excellent, High, Medium, Low or Critical. |
 | `sensor.<lock>_bold_connect_signal_strength` | The same signal in dBm. Disabled by default. |
 | `update.<lock>_firmware` | Whether the lock is on the firmware version Bold requires. |
+| `select.<lock>_unlock_method` | For locks with a Bold Connect, when Home Assistant has Bluetooth: **Prefer Bluetooth** (the default), **Prefer Bold Connect**, **Bluetooth only** or **Bold Connect only**. With a preference, the other way is used when the first fails, and Bluetooth is only tried when Home Assistant hears the lock well (−85 dBm or better). |
 
 Each Bold Connect is a device too, and the locks it serves are linked to it:
 
@@ -82,6 +89,12 @@ integration polls Bold's cloud:
 - **Devices** (battery, signal, firmware, Bold Connect status) every 10 minutes.
 
 Unlocking from Home Assistant updates the lock straight away.
+
+For Bluetooth, Bold's cloud issues each lock a handshake (valid for about a
+week) and signed commands. The integration fetches them every 12 hours and
+stores them, so locks in Bluetooth range can be unlocked for several days
+without internet. Home Assistant tracks which locks it can hear as they
+advertise.
 
 ## Use cases
 
@@ -160,8 +173,11 @@ actions:
 - **Delays.** Activity from outside Home Assistant (app, PIN, button, key fob)
   appears within about 30 seconds. A Bold Connect going offline is noticed
   after 30–40 minutes.
-- **Remote unlocking needs a Bold Connect.** Unlocking over Bluetooth isn't
-  supported.
+- **Bluetooth uses an undocumented part of Bold's API**, the one the Bold app
+  uses. Bold could change it without notice; the Bold Connect keeps working
+  either way.
+- **Locks without a Bold Connect** only report activity to Bold (and so to
+  Home Assistant) when a phone with the Bold app passes by.
 - **Keep-active mode isn't supported.** It's a Bold Pro feature. Keep-active
   periods started from the Bold app are shown on the lock.
 - **Firmware.** Bold only reports the firmware version it _requires_, which may
@@ -176,6 +192,11 @@ actions:
 - **Unlocking fails with "No Bold Connect is available".** The Connect is
   offline or out of range of the lock. Check its power and Wi-Fi, and its
   `connectivity` sensor.
+- **A lock isn't unlocked over Bluetooth.** Home Assistant needs to hear the
+  lock well: add an ESPHome Bluetooth proxy near the door. The integration's
+  diagnostics show whether each lock is reachable, and when its Bluetooth keys
+  expire. When unlocking over Bluetooth fails, the log says why before falling
+  back to the Bold Connect.
 - **Unlocking fails with "Too many requests".** Bold limits how often locks can
   be activated. Wait a moment and try again.
 - **A lock has no activity entity.** The lock doesn't support Bold's event log.
@@ -198,6 +219,7 @@ disable it to download the log). Personal details are removed from diagnostics.
    menu and choose **Delete**.
 2. To remove the integration's files too, remove **Bold Smart Lock** in HACS and
    restart Home Assistant.
+   This also deletes the Bluetooth keys stored for your locks.
 3. If you added your own Bold OAuth client, you can remove it under
    **Settings → Devices & services → ⋮ → Application credentials**.
 
@@ -211,7 +233,16 @@ mypy
 python script/translations.py  # after changing strings.json
 ```
 
+## Security
+
+The Bluetooth keys are stored in Home Assistant's `.storage` folder, like your
+Bold sign-in. Anyone who can read that folder (or a backup of it) could unlock
+your locks over Bluetooth, from within Bluetooth range, until the keys expire
+(about a week). Diagnostics never include them.
+
 ## License
 
-The code is licensed under the [Apache License 2.0](LICENSE). The Bold name and
+The code is licensed under the [Apache License 2.0](LICENSE). The Bluetooth
+protocol is ported from
+[homebridge-bold-ble](https://github.com/robbertkl/homebridge-bold-ble) (MIT). The Bold name and
 logos are trademarks of Bold Smart Lock.

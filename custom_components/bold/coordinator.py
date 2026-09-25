@@ -22,6 +22,9 @@ from .api import (
     BoldForbiddenError,
 )
 from .const import DEVICE_SCAN_INTERVAL, DOMAIN, EVENT_POLL_OVERLAP, EVENT_SCAN_INTERVAL
+from .keys import BoldBluetoothKeys
+from .tracker import BoldBluetoothTracker
+from .unlock import BoldUnlockMethods
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +41,9 @@ class BoldRuntimeData:
     client: BoldClient
     devices: BoldDeviceCoordinator
     events: BoldEventCoordinator
+    bluetooth_keys: BoldBluetoothKeys
+    bluetooth: BoldBluetoothTracker
+    unlock_methods: BoldUnlockMethods
 
 
 class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):
