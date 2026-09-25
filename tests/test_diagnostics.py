@@ -5,10 +5,14 @@ from __future__ import annotations
 import base64
 import json
 
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+from syrupy.assertion import SnapshotAssertion
 
+from custom_components.bold.const import EVENT_SCAN_INTERVAL
 from custom_components.bold.diagnostics import async_get_config_entry_diagnostics
 
 from .conftest import (
@@ -18,41 +22,55 @@ from .conftest import (
     HANDSHAKE_PAYLOAD,
     LOCK_ID,
     FakeBluetooth,
+    advance,
+    event_payload,
+    set_events,
 )
 
 
 async def test_diagnostics(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+    snapshot: SnapshotAssertion,
 ) -> None:
-    """Test diagnostics include devices and redact the token."""
+    """Test diagnostics, with secrets and personal details redacted.
+
+    Update the snapshot with `pytest --snapshot-update`, and check the diff
+    for anything that should be redacted.
+    """
+    set_events(
+        mock_api,
+        [
+            event_payload(
+                10,
+                "DeviceActivation",
+                "2026-09-24T12:00:10Z",
+                result="Success",
+                user={
+                    "id": 3,
+                    "firstName": "Ada",
+                    "lastName": "Lovelace",
+                    "emailAddress": "ada@example.com",
+                },
+                organization={"id": 7, "name": "The Lovelaces"},
+            )
+        ],
+    )
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+
     diagnostics = await async_get_config_entry_diagnostics(hass, init_integration)
+    assert diagnostics == snapshot
+    # Nobody's name or email address is included, in devices or events.
+    output = json.dumps(diagnostics)
+    for personal in ("Ada", "Lovelace", "ada@example.com"):
+        assert personal not in output
+    # The token, and the webhook's ID and secret, which let anyone push
+    # events, are never included.
     assert diagnostics["entry"]["token"] == REDACTED
-    assert [device["name"] for device in diagnostics["devices"]] == [
-        "Front Door",
-        "Bold Connect",
-    ]
-    assert diagnostics["event_log_devices"] == [LOCK_ID]
-    assert diagnostics["recent_events"] == []
-    assert diagnostics["push"] == {
-        "active": False,
-        "last_push": None,
-        "bold_webhooks": 0,
-        "cloudhook": False,
-    }
-    # The webhook's ID and secret let anyone push events, so aren't included.
     assert diagnostics["entry"]["webhook_id"] == REDACTED
     assert diagnostics["entry"]["webhook_secret"] == REDACTED
-    assert diagnostics["bluetooth"] == {
-        "enabled": False,
-        "locks": {
-            str(LOCK_ID): {
-                "reachable": False,
-                "unlock_method": "prefer_connect",
-                "handshake_expires": None,
-                "commands": {},
-            }
-        },
-    }
 
 
 async def test_diagnostics_bluetooth(

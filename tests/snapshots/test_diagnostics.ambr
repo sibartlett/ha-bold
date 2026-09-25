@@ -1,0 +1,144 @@
+# serializer version: 1
+# name: test_diagnostics
+  dict({
+    'bluetooth': dict({
+      'enabled': False,
+      'locks': dict({
+        '1': dict({
+          'commands': dict({
+          }),
+          'handshake_expires': None,
+          'reachable': False,
+          'unlock_method': 'prefer_connect',
+        }),
+      }),
+    }),
+    'devices': list([
+      dict({
+        'actualFirmwareVersion': 90,
+        'addons': list([
+        ]),
+        'batteryLastMeasurement': '2026-09-24T09:00:00Z',
+        'batteryLevel': 'Excellent',
+        'entryTags': list([
+        ]),
+        'features': dict({
+          'eventLog': True,
+          'lockedStatus': False,
+          'remoteAccess': True,
+        }),
+        'gateway': dict({
+          'id': 2,
+          'lastSeen': '2026-09-24T10:00:00Z',
+          'rssi': -60,
+          'rssiLevel': 'High',
+        }),
+        'id': 1,
+        'locked': 'UNKNOWN',
+        'matter': dict({
+        }),
+        'model': dict({
+          'description': 'Smart Cylinder SX',
+          'id': 1,
+          'name': 'SX33',
+          'type': dict({
+            'description': 'Lock',
+            'id': 1,
+            'name': 'Lock',
+          }),
+        }),
+        'name': 'Front Door',
+        'owner': dict({
+          'accountId': 42,
+          'firstName': '**REDACTED**',
+          'lastName': '**REDACTED**',
+          'name': '**REDACTED**',
+          'organizationId': 7,
+        }),
+        'reachableDevices': list([
+        ]),
+        'reachableGateways': list([
+        ]),
+        'relatedDeviceGroups': list([
+        ]),
+        'requiredFirmwareVersion': 90,
+        'settings': dict({
+          'activationTime': 5,
+        }),
+        'timeZone': 'Europe/Amsterdam',
+      }),
+      dict({
+        'features': dict({
+          'eventLog': False,
+          'remoteAccess': False,
+        }),
+        'gateway': dict({
+          'id': 2,
+          'lastSeen': '2026-09-24T11:55:00Z',
+          'rssi': 0,
+          'rssiLevel': 'Excellent',
+        }),
+        'id': 2,
+        'locked': 'UNKNOWN',
+        'model': dict({
+          'description': 'Bold Connect',
+          'id': 4,
+          'name': 'CONNECT',
+          'type': dict({
+            'description': 'Connect',
+            'id': 2,
+            'name': 'Gateway',
+          }),
+        }),
+        'name': 'Bold Connect',
+        'owner': dict({
+          'organizationId': 7,
+        }),
+        'settings': dict({
+        }),
+      }),
+    ]),
+    'entry': dict({
+      'auth_implementation': 'bold',
+      'token': '**REDACTED**',
+      'webhook_id': '**REDACTED**',
+      'webhook_secret': '**REDACTED**',
+    }),
+    'event_log_devices': list([
+      1,
+    ]),
+    'push': dict({
+      'active': False,
+      'bold_webhooks': 0,
+      'cloudhook': False,
+      'last_push': None,
+    }),
+    'recent_events': list([
+      dict({
+        'category': 'AccessEvent',
+        'device': dict({
+          'id': 1,
+          'name': 'Front Door',
+        }),
+        'id': 10,
+        'organization': dict({
+          'id': 7,
+          'name': '**REDACTED**',
+        }),
+        'result': 'Success',
+        'time': '2026-09-24T12:00:10Z',
+        'triggeredBy': dict({
+          'accountId': 42,
+          'userId': 3,
+        }),
+        'type': 'DeviceActivation',
+        'user': dict({
+          'emailAddress': '**REDACTED**',
+          'firstName': '**REDACTED**',
+          'id': 3,
+          'lastName': '**REDACTED**',
+        }),
+      }),
+    ]),
+  })
+# ---

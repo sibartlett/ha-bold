@@ -9,7 +9,7 @@ import copy
 from datetime import timedelta
 import time
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.application_credentials import (
@@ -25,7 +25,9 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
+from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import DOMAIN
@@ -42,7 +44,13 @@ GATEWAY_ID = 2
 LOCK = {
     "id": LOCK_ID,
     "name": "Front Door",
-    "owner": {"organizationId": 7, "accountId": ACCOUNT_ID, "name": ""},
+    "owner": {
+        "organizationId": 7,
+        "accountId": ACCOUNT_ID,
+        "name": "Ada Lovelace",
+        "firstName": "Ada",
+        "lastName": "Lovelace",
+    },
     "model": {
         "id": 1,
         "name": "SX33",
@@ -175,6 +183,23 @@ async def init_integration(
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
     return mock_config_entry
+
+
+@pytest.fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """Snapshot with Home Assistant's extension, which hides random IDs."""
+    return snapshot.use_extension(HomeAssistantSnapshotExtension)
+
+
+@pytest.fixture
+def entity_registry_enabled_by_default() -> Generator[None]:
+    """Enable entities that are disabled by default, as Home Assistant core does."""
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        return_value=True,
+        new_callable=PropertyMock,
+    ):
+        yield
 
 
 @pytest.fixture
