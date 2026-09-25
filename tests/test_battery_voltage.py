@@ -21,6 +21,7 @@ from .conftest import GATEWAY, LOCK, event_payload, set_events
 
 IDLE = "sensor.front_door_battery_voltage"
 UNDER_LOAD = "sensor.front_door_battery_voltage_under_load"
+TEMPERATURE = "sensor.front_door_temperature"
 
 # Shaped like the debug event a Bold Classic sends when it's activated.
 DEBUG_EVENT = event_payload(
@@ -64,13 +65,17 @@ async def _poll(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
     await hass.async_block_till_done()
 
 
-async def test_voltage_from_activation(
+async def test_voltage_from_debug_event(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     mock_api: AiohttpClientMocker,
     frozen_time: FrozenDateTimeFactory,
 ) -> None:
-    """Test the voltages reported with an activation."""
+    """Test the voltage at rest from a clutch debug event.
+
+    Its samples while the motor runs are a different measure than the lock's
+    own voltage under load, so they aren't used for it.
+    """
     assert hass.states.get(IDLE).state == STATE_UNKNOWN
     set_events(mock_api, [DEBUG_EVENT])
     await _poll(hass, frozen_time)
@@ -79,33 +84,59 @@ async def test_voltage_from_activation(
     assert state.state == "3.063"
     assert state.attributes["unit_of_measurement"] == "V"
     assert state.attributes["device_class"] == "voltage"
-    assert hass.states.get(UNDER_LOAD).state == "2.682"
+    assert hass.states.get(UNDER_LOAD).state == STATE_UNKNOWN
 
 
-async def test_voltage_from_status(
+def _status(
+    event_id: int, time: str, idle: int, under_load: int, temperature: int
+) -> dict:
+    """A daily status event, shaped like a Bold Classic's."""
+    return event_payload(
+        event_id,
+        "DeviceStatus",
+        time,
+        category="DeviceEvent",
+        uptime=30000000,
+        voltageIdle=idle,
+        voltageUnderLoad=under_load,
+        averageTemperature=temperature,
+        cumulativeActivationsBle=100,
+        cumulativeActivationsButton=50,
+        cumulativeActivationsPin=10,
+    )
+
+
+async def test_daily_status(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     mock_api: AiohttpClientMocker,
     frozen_time: FrozenDateTimeFactory,
 ) -> None:
-    """Test the voltages from a status event."""
-    set_events(
-        mock_api,
-        [
-            event_payload(
-                21,
-                "DeviceStatus",
-                "2026-09-24T12:00:10Z",
-                category="DeviceEvent",
-                uptime=5,
-                voltageIdle=2950,
-                voltageUnderLoad=2600,
-            )
-        ],
-    )
+    """Test the voltages and temperature from the daily status."""
+    set_events(mock_api, [_status(21, "2026-09-24T12:00:10Z", 3061, 2945, 18)])
     await _poll(hass, frozen_time)
-    assert hass.states.get(IDLE).state == "2.95"
-    assert hass.states.get(UNDER_LOAD).state == "2.6"
+    assert hass.states.get(IDLE).state == "3.061"
+    assert hass.states.get(UNDER_LOAD).state == "2.945"
+    state = hass.states.get(TEMPERATURE)
+    assert state.state == "18.0"
+    assert state.attributes["unit_of_measurement"] == "°C"
+    assert state.attributes["device_class"] == "temperature"
+
+
+async def test_status_without_load_measurement(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test a status reporting 0 under load (not measured) is ignored for it."""
+    set_events(mock_api, [_status(21, "2026-09-24T12:00:10Z", 3061, 2945, 18)])
+    await _poll(hass, frozen_time)
+    set_events(mock_api, [_status(22, "2026-09-24T12:00:40Z", 3073, 0, -2)])
+    await _poll(hass, frozen_time)
+    assert hass.states.get(IDLE).state == "3.073"
+    assert hass.states.get(UNDER_LOAD).state == "2.945"
+    assert hass.states.get(TEMPERATURE).state == "-2.0"
 
 
 async def test_other_events_ignored(
@@ -188,26 +219,25 @@ async def test_voltage_from_history(
     mock_config_entry: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    """Test sensors start from the latest reading of the past week.
-
-    Locks only report voltages when they're turned, which can be days ago.
-    """
-    older = {**DEBUG_EVENT, "id": 30, "time": "2026-09-20T08:00:00Z"}
-    older["body"] = {**DEBUG_EVENT["body"], "voltageIdle": 3100, "voltage3": 2700}
-    newer = {**DEBUG_EVENT, "id": 31, "time": "2026-09-22T08:00:00Z"}
+    """Test sensors start from the latest readings of the past week."""
+    older = _status(30, "2026-09-20T20:58:00Z", 3100, 2990, 15)
+    status = _status(31, "2026-09-22T20:58:00Z", 3061, 2945, 18)
+    newer = {**DEBUG_EVENT, "id": 32, "time": "2026-09-23T08:00:00Z"}
     aioclient_mock.get(f"{API_URL}/v2/devices", json=[LOCK, GATEWAY])
     aioclient_mock.get(
         f"{API_URL}/v2/events",
         params={"type": "DeviceStatus DeviceDebug"},
-        json=[newer, older],
+        json=[newer, status, older],
     )
     aioclient_mock.get(f"{API_URL}/v2/events", json=[])
     mock_config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
+    # The latest of each: at rest from the debug event, the rest from the status.
     assert hass.states.get(IDLE).state == "3.063"
-    assert hass.states.get(UNDER_LOAD).state == "2.682"
+    assert hass.states.get(UNDER_LOAD).state == "2.945"
+    assert hass.states.get(TEMPERATURE).state == "18.0"
     history_call = next(
         call for call in aioclient_mock.mock_calls if "type" in call[1].query
     )

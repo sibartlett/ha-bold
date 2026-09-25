@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
 
@@ -10,12 +11,14 @@ from homeassistant.components.sensor import (
     RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
     UnitOfElectricPotential,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -52,11 +55,8 @@ async def async_setup_entry(
             entities.append(BoldBluetoothSignalSensor(data, device))
         if device.is_lock and device.event_log:
             entities.extend(
-                BoldBatteryVoltageSensor(data.events, device, key, voltage)
-                for key, voltage in (
-                    ("battery_voltage", idle_voltage),
-                    ("battery_voltage_under_load", voltage_under_load),
-                )
+                BoldReportedSensor(data.events, device, description)
+                for description in REPORTED_SENSORS
             )
         if device.is_lock:
             entities.append(
@@ -183,15 +183,24 @@ class BoldBluetoothSignalSensor(BoldEntity, SensorEntity):
         return self._tracker.rssi(self.device_id)
 
 
-def _millivolts(value: object) -> float | None:
-    """Convert a voltage in millivolts, as Bold reports it, to volts."""
-    if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+def _number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
         return None
-    return round(value / 1000, 3)
+    return float(value)
+
+
+def _millivolts(value: object) -> float | None:
+    """Convert a voltage in millivolts, as Bold reports it, to volts.
+
+    Zero means the lock didn't measure it.
+    """
+    if (number := _number(value)) is None or number <= 0:
+        return None
+    return round(number / 1000, 3)
 
 
 def idle_voltage(event: BoldEvent) -> float | None:
-    """Return the battery voltage at rest, from a status or debug event."""
+    """Return the battery voltage at rest, from a daily status or debug event."""
     if event.type == "DeviceStatus":
         return _millivolts(event.raw.get("voltageIdle"))
     if event.type == "DeviceDebug" and isinstance(body := event.raw.get("body"), dict):
@@ -200,52 +209,82 @@ def idle_voltage(event: BoldEvent) -> float | None:
 
 
 def voltage_under_load(event: BoldEvent) -> float | None:
-    """Return the lowest battery voltage while the motor ran.
+    """Return the battery voltage under load, from the daily status.
 
-    Status events report it; debug events of an activation sample the voltage
-    as the motor runs (voltage0, voltage1, ...).
+    Debug events also sample the voltage while the motor runs, but those
+    samples are lower than the lock's own measurement, so they aren't mixed in.
     """
     if event.type == "DeviceStatus":
         return _millivolts(event.raw.get("voltageUnderLoad"))
-    if event.type == "DeviceDebug" and isinstance(body := event.raw.get("body"), dict):
-        samples = [
-            volts
-            for key, value in body.items()
-            if key.startswith("voltage")
-            and key[len("voltage") :].isdigit()
-            and (volts := _millivolts(value)) is not None
-        ]
-        return min(samples, default=None)
     return None
 
 
-class BoldBatteryVoltageSensor(CoordinatorEntity[BoldEventCoordinator], RestoreSensor):
-    """A battery voltage of a Bold lock, reported with its activity.
+def average_temperature(event: BoldEvent) -> float | None:
+    """Return the lock's average temperature, from the daily status."""
+    if event.type == "DeviceStatus":
+        return _number(event.raw.get("averageTemperature"))
+    return None
 
-    Locks report their voltage when they're used, so the last reading is
-    kept across restarts.
+
+@dataclass(frozen=True, kw_only=True)
+class BoldReportedSensorDescription(SensorEntityDescription):
+    """A value Bold locks report in their event log."""
+
+    value_fn: Callable[[BoldEvent], float | None]
+
+
+REPORTED_SENSORS: tuple[BoldReportedSensorDescription, ...] = (
+    BoldReportedSensorDescription(
+        key="battery_voltage",
+        translation_key="battery_voltage",
+        device_class=SensorDeviceClass.VOLTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=idle_voltage,
+    ),
+    BoldReportedSensorDescription(
+        key="battery_voltage_under_load",
+        translation_key="battery_voltage_under_load",
+        device_class=SensorDeviceClass.VOLTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=voltage_under_load,
+    ),
+    BoldReportedSensorDescription(
+        key="temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=average_temperature,
+    ),
+)
+
+
+class BoldReportedSensor(CoordinatorEntity[BoldEventCoordinator], RestoreSensor):
+    """A value a Bold lock reports in its event log, e.g. in its daily status.
+
+    Readings are infrequent, so the last one is kept across restarts.
     """
 
     _attr_has_entity_name = True
-    _attr_device_class = SensorDeviceClass.VOLTAGE
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_suggested_display_precision = 2
+    entity_description: BoldReportedSensorDescription
 
     def __init__(
         self,
         coordinator: BoldEventCoordinator,
         device: BoldDevice,
-        key: str,
-        voltage: Callable[[BoldEvent], float | None],
+        description: BoldReportedSensorDescription,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
+        self.entity_description = description
         self.device_id = device.id
-        self._voltage = voltage
-        self._attr_translation_key = key
-        self._attr_unique_id = f"{device.id}_{key}"
+        self._attr_unique_id = f"{device.id}_{description.key}"
         self._attr_device_info = device_info(device)
 
     async def async_added_to_hass(self) -> None:
@@ -270,6 +309,6 @@ class BoldBatteryVoltageSensor(CoordinatorEntity[BoldEventCoordinator], RestoreS
         for event in events:
             if (
                 event.device_id == self.device_id
-                and (volts := self._voltage(event)) is not None
+                and (value := self.entity_description.value_fn(event)) is not None
             ):
-                self._attr_native_value = volts
+                self._attr_native_value = value

@@ -63,8 +63,9 @@ Each lock gets:
 | `event.<lock>_activity` | Fires for activations (with the user and method: PIN, button, app…), failed activations such as a wrong PIN, deactivations, and tamper alerts. |
 | `sensor.<lock>_battery_level` | Battery level as Bold reports it: Excellent, High, Medium, Low or Critical. |
 | `binary_sensor.<lock>_battery` | Low battery: on when the level is Low or Critical. |
-| `sensor.<lock>_battery_voltage` | Battery voltage at rest. Locks report it when they're turned (not on every activation), so it starts from the latest reading of the past week, and keeps its last reading across restarts. |
-| `sensor.<lock>_battery_voltage_under_load` | The lowest battery voltage while the motor runs. Weak batteries sag under load before they drop at rest, so this is the earlier warning. |
+| `sensor.<lock>_battery_voltage` | Battery voltage at rest, from the lock's daily status report (and occasional extra readings). |
+| `sensor.<lock>_battery_voltage_under_load` | Battery voltage under load, from the daily status report. Weak batteries sag under load before they drop at rest, so this is the earlier warning. Unknown for a lock that doesn't measure it, e.g. on days its motor didn't run. |
+| `sensor.<lock>_temperature` | The lock's average temperature, from the daily status report. |
 | `sensor.<lock>_bold_connect_signal` | How well the lock reaches its Bold Connect: Excellent, High, Medium, Low or Critical. |
 | `sensor.<lock>_bold_connect_signal_strength` | The same signal in dBm. Disabled by default. |
 | `sensor.<lock>_bluetooth_signal` | How well Home Assistant hears the lock over Bluetooth, in dBm; unavailable when it can't. Handy for placing an ESPHome Bluetooth proxy. Only when Home Assistant has Bluetooth. |
@@ -92,6 +93,10 @@ integration polls Bold's cloud:
   Bold. Locks upload their events when a Bold Connect or phone next syncs with
   them, which can be later, so every 10 minutes a poll looks back an hour to
   pick up events that arrived late, such as battery voltage readings.
+- **Battery voltages and temperature** come from a status report each lock
+  sends once a day, at a fixed time. They keep their last reading across
+  restarts, and start from the past week's readings when the integration is set
+  up.
 - **Devices** (battery, signal, firmware, Bold Connect status) every 10 minutes.
 
 Unlocking from Home Assistant updates the lock straight away.
