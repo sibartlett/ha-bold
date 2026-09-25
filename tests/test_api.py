@@ -25,7 +25,7 @@ from custom_components.bold.api import (
 )
 from custom_components.bold.const import API_URL
 
-from .conftest import LOCK, LOCK_ID, event_payload
+from .conftest import GATEWAY_ID, LOCK, LOCK_ID, event_payload
 
 
 @pytest.mark.parametrize(
@@ -112,15 +112,15 @@ def test_event_from_api() -> None:
 def test_event_remote_activation_via_connect() -> None:
     """Test an activation through a Bold Connect counts as remote.
 
-    Bold doesn't always send remoteActivation; this is a real activation
-    from Home Assistant.
+    Bold doesn't always send remoteActivation; this is the shape of a real
+    activation from Home Assistant.
     """
     event = BoldEvent.from_api(
         event_payload(
             10,
             "DeviceActivation",
             "2026-09-25T04:15:09Z",
-            connect={"id": 2, "name": "Bold Connect"},
+            connect={"id": GATEWAY_ID, "name": "Bold Connect"},
             clientId="HomeAssistant",
             method="Ble",
             result="Success",

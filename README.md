@@ -45,7 +45,7 @@ integration polls:
 
 ## Installation
 
-1. Add this repository to HACS as a custom repository (type: Integration) and install it.
+1. In HACS, add `https://github.com/sibartlett/ha-bold` as a custom repository (type: Integration), then install **Bold Smart Lock**.
 2. Restart Home Assistant.
 3. Add the **Bold Smart Lock** integration and sign in with your Bold account.
 
