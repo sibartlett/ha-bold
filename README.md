@@ -67,7 +67,7 @@ Each lock gets:
 | `sensor.<lock>_bold_connect_signal_strength` | The same signal in dBm. Disabled by default. |
 | `sensor.<lock>_bluetooth_signal` | How well Home Assistant hears the lock over Bluetooth, in dBm; unavailable when it can't. Handy for placing an ESPHome Bluetooth proxy. Only when Home Assistant has Bluetooth. |
 | `update.<lock>_firmware` | Whether the lock is on the firmware version Bold requires. |
-| `select.<lock>_unlock_method` | For locks with a Bold Connect, when Home Assistant has Bluetooth: **Prefer Bluetooth** (the default), **Prefer Bold Connect**, **Bluetooth only** or **Bold Connect only**. With a preference, the other way is used when the first fails, and Bluetooth is only tried when Home Assistant hears the lock well (−85 dBm or better). |
+| `select.<lock>_unlock_method` | For locks with a Bold Connect, when Home Assistant has Bluetooth: **Prefer Bold Connect** (the default), **Prefer Bluetooth**, **Bluetooth only** or **Bold Connect only**. With a preference, the other way is used when the first fails. With **Prefer Bluetooth**, Bluetooth is only tried first when Home Assistant hears the lock well (−85 dBm or better). |
 
 Each Bold Connect is a device too, and the locks it serves are linked to it:
 

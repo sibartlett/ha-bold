@@ -144,10 +144,11 @@ class BoldLock(BoldEntity, LockEntity):
         """Return the usable routes to the lock, in order of preference."""
         method = self._data.unlock_methods.get(self.device_id)
         connect = self._connect_usable()
-        # With the Connect to fall back to, only try a strong Bluetooth signal.
+        # Only try Bluetooth ahead of a usable Connect with a strong signal. As a
+        # fallback, or the only way, any signal is worth a try.
         min_rssi = (
             BLUETOOTH_MIN_RSSI
-            if connect and method is not UnlockMethod.BLUETOOTH_ONLY
+            if connect and method is UnlockMethod.PREFER_BLUETOOTH
             else None
         )
         bluetooth = (

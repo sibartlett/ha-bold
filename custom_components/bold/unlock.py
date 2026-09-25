@@ -17,6 +17,10 @@ class UnlockMethod(StrEnum):
     CONNECT_ONLY = "connect_only"
 
 
+# The Bold Connect is the dependable default; Bluetooth depends on range.
+DEFAULT_UNLOCK_METHOD = UnlockMethod.PREFER_CONNECT
+
+
 class Route(StrEnum):
     """A way to reach a lock."""
 
@@ -42,7 +46,7 @@ class BoldUnlockMethods:
 
     def get(self, device_id: int) -> UnlockMethod:
         """Return a lock's unlock method."""
-        return self._methods.get(device_id, UnlockMethod.PREFER_BLUETOOTH)
+        return self._methods.get(device_id, DEFAULT_UNLOCK_METHOD)
 
     @callback
     def async_set(self, device_id: int, method: UnlockMethod) -> None:

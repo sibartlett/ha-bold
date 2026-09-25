@@ -38,7 +38,7 @@ async def test_diagnostics(
         "locks": {
             str(LOCK_ID): {
                 "reachable": False,
-                "unlock_method": "prefer_bluetooth",
+                "unlock_method": "prefer_connect",
                 "handshake_expires": None,
                 "commands": {},
             }
@@ -56,7 +56,7 @@ async def test_diagnostics_bluetooth(
     expires = "2099-01-01T00:00:00+00:00"
     assert diagnostics["bluetooth"]["locks"][str(LOCK_ID)] == {
         "reachable": True,
-        "unlock_method": "prefer_bluetooth",
+        "unlock_method": "prefer_connect",
         "handshake_expires": expires,
         "commands": {"Activate": expires, "Deactivate": expires},
     }
