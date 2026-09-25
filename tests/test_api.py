@@ -146,10 +146,16 @@ def test_event_user_fallbacks() -> None:
 def test_event_from_api_malformed() -> None:
     """Test malformed events are skipped."""
     assert BoldEvent.from_api({"id": 1, "type": "DeviceActivation"}) is None
-    assert (
-        BoldEvent.from_api({"type": "DeviceActivation", "time": "2026-09-24T12:00:00Z"})
-        is None
+    assert BoldEvent.from_api({"id": 1, "time": "2026-09-24T12:00:00Z"}) is None
+
+
+def test_event_from_api_without_id() -> None:
+    """Test pushed events, which have no ID, are accepted."""
+    event = BoldEvent.from_api(
+        {"type": "DeviceActivation", "time": "2026-09-24T12:00:00Z"}
     )
+    assert event is not None
+    assert event.id is None
 
 
 def _client(hass: HomeAssistant) -> BoldClient:

@@ -129,7 +129,8 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         # Status and debug events from before startup, which carry voltages.
         self.status_history: list[BoldEvent] = []
         self._cursor: datetime | None = None
-        self._seen: dict[int, datetime] = {}
+        # Seen events, by BoldEvent.key.
+        self._seen: dict[tuple[str, int | None, datetime, bool | None], datetime] = {}
         self._primed: set[int] = set()
         self._last_catch_up: datetime | None = None
         self.push_active = False
@@ -146,7 +147,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         except BoldError as err:
             _LOGGER.debug("Couldn't fetch recent status events: %s", err)
             return
-        self.status_history = sorted(events, key=lambda event: (event.time, event.id))
+        self.status_history = sorted(events, key=lambda event: event.sort_key)
 
     async def _async_update_data(self) -> list[BoldEvent]:
         """Fetch events since the last poll."""
@@ -208,11 +209,11 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         """Record events, returning those not seen before, oldest first."""
         cursor = self._cursor or now
         new_events = sorted(
-            (event for event in events if event.id not in self._seen),
-            key=lambda event: (event.time, event.id),
+            (event for event in events if event.key not in self._seen),
+            key=lambda event: event.sort_key,
         )
         for event in new_events:
-            self._seen[event.id] = event.time
+            self._seen[event.key] = event.time
             self.recent_events.append(event)
             cursor = max(cursor, event.time)
         self._cursor = cursor
@@ -221,9 +222,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
             min(cursor - EVENT_POLL_OVERLAP, now - EVENT_CATCH_UP_LOOKBACK)
             - EVENT_POLL_OVERLAP
         )
-        self._seen = {
-            event_id: time for event_id, time in self._seen.items() if time >= horizon
-        }
+        self._seen = {key: time for key, time in self._seen.items() if time >= horizon}
         return new_events
 
     @callback

@@ -291,7 +291,7 @@ class BoldReportedSensor(CoordinatorEntity[BoldEventCoordinator], RestoreSensor)
         self._update_from(
             sorted(
                 [*self.coordinator.status_history, *self.coordinator.recent_events],
-                key=lambda event: (event.time, event.id),
+                key=lambda event: event.sort_key,
             )
         )
 

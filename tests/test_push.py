@@ -228,6 +228,7 @@ async def test_pushed_events(
     mock_config_entry: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
     hass_client_no_auth: ClientSessionGenerator,
+    frozen_time: FrozenDateTimeFactory,
 ) -> None:
     """Test events pushed with Bold's secret are handled, others rejected."""
     _mock_bold(aioclient_mock)
@@ -235,16 +236,12 @@ async def test_pushed_events(
     client = await hass_client_no_auth()
     path = f"/api/webhook/{mock_config_entry.data[CONF_WEBHOOK_ID]}"
     secret = mock_config_entry.data[CONF_WEBHOOK_SECRET]
-    # Bold sends a list of events, in the event log's format.
-    payload = [
-        event_payload(
-            10,
-            "DeviceActivation",
-            "2026-09-24T12:00:01Z",
-            method="Button",
-            result="Success",
-        )
-    ]
+    # Bold pushes a list of events, like the event log's but without IDs.
+    polled = event_payload(10, "DeviceLocked", "2026-09-24T12:00:01Z", status="Locked")
+    pushed = {
+        key: value for key, value in polled.items() if key not in ("id", "triggeredBy")
+    } | {"innerKnobAngle": 90, "innerKnobRotation": "Clockwise"}
+    payload = [pushed]
 
     response = await client.post(path, json=payload, headers={"X-Bold-Secret": "wrong"})
     assert response.status == 401
@@ -261,14 +258,20 @@ async def test_pushed_events(
     assert response.status == 200
     await hass.async_block_till_done()
     state = hass.states.get(ACTIVITY)
-    assert state.attributes["event_type"] == "activated"
-    assert state.attributes["bold_event_id"] == 10
-
-    # The same event, polled or pushed again, doesn't fire twice.
+    assert state.attributes["event_type"] == "locked"
     fired_at = state.state
+
+    # The same event, pushed again or polled later, doesn't fire twice, and
+    # isn't taken as one the webhook missed.
     response = await client.post(path, json=payload, headers={"X-Bold-Secret": secret})
     await hass.async_block_till_done()
     assert hass.states.get(ACTIVITY).state == fired_at
+    set_events(aioclient_mock, [polled])
+    frozen_time.tick(EVENT_PUSH_SCAN_INTERVAL)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(ACTIVITY).state == fired_at
+    assert mock_config_entry.runtime_data.events.push_active
 
 
 async def test_missed_push_polls_faster(

@@ -230,9 +230,12 @@ class BoldDevice:
 
 @dataclass(frozen=True)
 class BoldEvent:
-    """An event, from GET /v2/events."""
+    """An event, from GET /v2/events or pushed to a webhook.
 
-    id: int
+    Pushed events have no ID.
+    """
+
+    id: int | None
     type: str
     time: datetime
     device_id: int | None
@@ -249,10 +252,11 @@ class BoldEvent:
     def from_api(cls, data: dict[str, Any]) -> BoldEvent | None:
         """Create an event from an API response, if it is well formed."""
         time = parse_datetime(data.get("time"))
-        if not isinstance(data.get("id"), int) or not data.get("type") or time is None:
+        if not data.get("type") or time is None:
             return None
+        event_id = data.get("id")
         return cls(
-            id=data["id"],
+            id=event_id if isinstance(event_id, int) else None,
             type=data["type"],
             time=time,
             device_id=(data.get("device") or {}).get("id"),
@@ -275,6 +279,21 @@ class BoldEvent:
             ),
             raw=data,
         )
+
+    @property
+    def key(self) -> tuple[str, int | None, datetime, bool | None]:
+        """Identify the event, whether it was polled or pushed."""
+        return (
+            self.type,
+            self.device_id,
+            self.time.replace(microsecond=0),
+            self.bolt_locked,
+        )
+
+    @property
+    def sort_key(self) -> tuple[datetime, int]:
+        """Order events by time, then ID."""
+        return (self.time, self.id or 0)
 
 
 class BoldClient:
