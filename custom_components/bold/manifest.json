@@ -4,10 +4,10 @@
   "codeowners": ["@sibartlett"],
   "config_flow": true,
   "dependencies": ["application_credentials"],
-  "documentation": "https://github.com/sibartlett/hass-bold",
+  "documentation": "https://github.com/sibartlett/ha-bold",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/sibartlett/hass-bold/issues",
+  "issue_tracker": "https://github.com/sibartlett/ha-bold/issues",
   "requirements": [],
   "version": "0.1.0"
 }
