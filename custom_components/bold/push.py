@@ -176,7 +176,7 @@ async def _async_register_with_bold(
     )
     if registered:
         _LOGGER.debug("Bold pushes events to %s", url)
-        data.events.async_set_push_active(True)
+        data.events.async_set_push_active(active=True)
 
 
 async def async_remove_push(

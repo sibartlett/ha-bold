@@ -7,7 +7,9 @@ testpaths = ["tests"]
 target-version = "py314"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "PL"]
+# As Home Assistant core: no private access or local imports without a
+# reason, and no stale noqa comments. And keep functions simple.
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "PL", "PLC0415", "SLF001", "RUF100", "C901"]
 ignore = ["E501", "PLR0911", "PLR0913", "PLR2004"]
 
 [tool.ruff.lint.isort]

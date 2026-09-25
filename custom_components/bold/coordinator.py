@@ -202,7 +202,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
                 "delivers again",
                 EVENT_SCAN_INTERVAL,
             )
-            self.async_set_push_active(False)
+            self.async_set_push_active(active=False)
         return delivered
 
     def _accept(self, events: list[BoldEvent], now: datetime) -> list[BoldEvent]:
@@ -231,7 +231,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         self.last_push = dt_util.utcnow()
         if not self.push_active:
             _LOGGER.info("Bold's webhook is delivering events again")
-            self.async_set_push_active(True)
+            self.async_set_push_active(active=True)
         if new_events := [
             event
             for event in self._accept(events, self.last_push)
@@ -240,7 +240,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
             self.async_set_updated_data(new_events)
 
     @callback
-    def async_set_push_active(self, active: bool) -> None:
+    def async_set_push_active(self, *, active: bool) -> None:
         """Poll less often while Bold pushes events to the webhook."""
         self.push_active = active
         self.update_interval = (

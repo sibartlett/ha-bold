@@ -31,6 +31,7 @@ from .boldsmartlock import (
     BoldBluetoothUnavailableError,
     BoldDevice,
     BoldError,
+    BoldEvent,
     BoldFirmwareOutdatedError,
     BoldGatewayNotFoundError,
     BoldRateLimitError,
@@ -338,28 +339,30 @@ class BoldLock(BoldEntity, LockEntity):
         """Apply activation events from the event log."""
         changed = False
         for event in self._events.data or []:
-            if event.device_id != self.device_id:
-                continue
-            if event.type == "DeviceActivation" and event.result == "Success":
-                until = event.time + (event.activation_time or self._activation_time)
-                if event.keep_active_until:
-                    until = max(until, event.keep_active_until)
-                if self._active_until is None or until > self._active_until:
-                    self._set_active(event.time, until)
-            elif event.type == "DeviceDeactivation":
-                if self._activated_at is None or event.time >= self._activated_at:
-                    self._set_inactive(event.time)
-            elif event.type == "DeviceLocked":
-                self._update_bolt(event.bolt_locked, event.time)
-                changed = True
-                continue
-            else:
-                continue
-            changed = True
-            if event.user_name:
-                self._attr_changed_by = event.user_name
+            if event.device_id == self.device_id:
+                changed = self._apply_event(event) or changed
         if changed:
             self.async_write_ha_state()
+
+    def _apply_event(self, event: BoldEvent) -> bool:
+        """Apply an event from the event log, returning whether it applied."""
+        if event.type == "DeviceLocked":
+            self._update_bolt(event.bolt_locked, event.time)
+            return True
+        if event.type == "DeviceActivation" and event.result == "Success":
+            until = event.time + (event.activation_time or self._activation_time)
+            if event.keep_active_until:
+                until = max(until, event.keep_active_until)
+            if self._active_until is None or until > self._active_until:
+                self._set_active(event.time, until)
+        elif event.type == "DeviceDeactivation":
+            if self._activated_at is None or event.time >= self._activated_at:
+                self._set_inactive(event.time)
+        else:
+            return False
+        if event.user_name:
+            self._attr_changed_by = event.user_name
+        return True
 
     def _update_bolt(self, locked: bool | None, changed: datetime | None) -> None:
         """Take a bolt position, unless an already known one is newer."""

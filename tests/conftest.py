@@ -185,8 +185,8 @@ def set_events(aioclient_mock: AiohttpClientMocker, events: list[dict]) -> None:
     aioclient_mock.mock_calls.clear()
     aioclient_mock._mocks = [  # noqa: SLF001
         mock
-        for mock in aioclient_mock._mocks
-        if "/v2/events" not in str(mock.url)  # noqa: SLF001
+        for mock in aioclient_mock._mocks  # noqa: SLF001
+        if "/v2/events" not in str(mock.url)
     ]
     aioclient_mock.get(f"{API_URL}/v2/events", json=events)
 
@@ -293,7 +293,7 @@ def fake_bluetooth(
 
     def start(self: BoldBluetoothTracker, entry: object) -> None:
         for device_id in fake.reachable:
-            self._reachable.add(device_id)  # noqa: SLF001
+            self._reachable.add(device_id)
 
     with (
         patch.object(BoldBluetoothTracker, "async_start", start),
