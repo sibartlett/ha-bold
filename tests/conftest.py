@@ -20,7 +20,8 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.bold.const import API_URL, DOMAIN
+from custom_components.bold.boldsmartlock.const import API_URL
+from custom_components.bold.const import DOMAIN
 from custom_components.bold.tracker import BoldBluetoothTracker
 
 CLIENT_ID = "client-id"

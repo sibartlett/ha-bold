@@ -18,8 +18,8 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
+from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import (
-    API_URL,
     DEVICE_SCAN_INTERVAL,
     DOMAIN,
     EVENT_SCAN_INTERVAL,

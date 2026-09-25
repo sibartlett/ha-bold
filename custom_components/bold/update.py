@@ -10,7 +10,7 @@ from homeassistant.components.update import UpdateDeviceClass, UpdateEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .api import BoldDevice
+from .boldsmartlock import BoldDevice
 from .coordinator import BoldConfigEntry
 from .entity import BoldEntity, async_add_device_entities
 

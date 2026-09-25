@@ -11,7 +11,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import pytest
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.bold.api import (
+from custom_components.bold.boldsmartlock.api import (
     PAGE_SIZE,
     BoldAuthError,
     BoldClient,
@@ -27,7 +27,7 @@ from custom_components.bold.api import (
     parse_datetime,
     parse_duration,
 )
-from custom_components.bold.const import API_URL
+from custom_components.bold.boldsmartlock.const import API_URL
 
 from .conftest import GATEWAY_ID, LOCK, LOCK_ID, event_payload
 

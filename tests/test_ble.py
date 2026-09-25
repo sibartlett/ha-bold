@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from custom_components.bold.ble import (
+from custom_components.bold.boldsmartlock.ble import (
     PACKET_COMMAND,
     PACKET_COMMAND_ACK,
     PACKET_EVENT,

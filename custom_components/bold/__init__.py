@@ -18,7 +18,7 @@ from homeassistant.helpers.config_entry_oauth2_flow import (
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .api import BoldClient
+from .boldsmartlock import BoldClient
 from .const import BATTERY_VOLTAGE_HISTORY, BLUETOOTH_KEYS_REFRESH_INTERVAL, DOMAIN
 from .coordinator import (
     BoldConfigEntry,

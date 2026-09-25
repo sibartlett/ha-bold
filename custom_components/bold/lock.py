@@ -20,17 +20,17 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.util import dt as dt_util
 
-from .api import (
+from .boldsmartlock import (
+    COMMAND_ACTIVATE,
+    COMMAND_DEACTIVATE,
     BoldAuthError,
+    BoldBluetoothError,
+    BoldBluetoothUnavailableError,
     BoldDevice,
     BoldError,
     BoldFirmwareOutdatedError,
     BoldGatewayNotFoundError,
     BoldRateLimitError,
-)
-from .ble import (
-    BoldBluetoothError,
-    BoldBluetoothUnavailableError,
     async_send_command,
 )
 from .const import (
@@ -42,7 +42,6 @@ from .const import (
 )
 from .coordinator import BoldConfigEntry, BoldRuntimeData
 from .entity import BoldEntity, async_add_device_entities
-from .keys import COMMAND_ACTIVATE, COMMAND_DEACTIVATE
 from .unlock import ROUTES, Route, UnlockMethod
 
 _LOGGER = logging.getLogger(__name__)

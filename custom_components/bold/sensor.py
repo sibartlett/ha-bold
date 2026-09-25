@@ -23,7 +23,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import BoldDevice, BoldEvent
+from .boldsmartlock import BoldDevice, BoldEvent
 from .coordinator import BoldConfigEntry, BoldEventCoordinator, BoldRuntimeData
 from .entity import BoldEntity, async_add_device_entities, device_info
 

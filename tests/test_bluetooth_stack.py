@@ -13,8 +13,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.bluetooth import BluetoothServiceInfo
 import pytest
 
-from custom_components.bold.api import BoldClient
-from custom_components.bold.ble import (
+from custom_components.bold.boldsmartlock.api import BoldClient
+from custom_components.bold.boldsmartlock.ble import (
     PACKET_CLIENT_BLOCKED,
     PACKET_COMMAND_ACK,
     PACKET_ENCRYPTION_ERROR,
@@ -28,7 +28,7 @@ from custom_components.bold.ble import (
     async_send_command,
     encode_packet,
 )
-from custom_components.bold.const import API_URL
+from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.keys import BoldBluetoothKeys
 from custom_components.bold.tracker import BoldBluetoothTracker
 

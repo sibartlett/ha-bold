@@ -10,7 +10,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import BoldDevice
+from .boldsmartlock import BoldDevice
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import BoldConfigEntry, BoldDeviceCoordinator
 

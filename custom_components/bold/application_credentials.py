@@ -3,7 +3,7 @@
 from homeassistant.components.application_credentials import AuthorizationServer
 from homeassistant.core import HomeAssistant
 
-from .const import OAUTH2_AUTHORIZE, OAUTH2_TOKEN
+from .boldsmartlock import OAUTH2_AUTHORIZE, OAUTH2_TOKEN
 
 
 async def async_get_authorization_server(hass: HomeAssistant) -> AuthorizationServer:

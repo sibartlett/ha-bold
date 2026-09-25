@@ -12,7 +12,7 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.service_info.bluetooth import BluetoothServiceInfo
 from homeassistant.util import dt as dt_util
 
-from .ble import MANUFACTURER_ID, parse_advertisement
+from .boldsmartlock import MANUFACTURER_ID, parse_advertisement
 
 if TYPE_CHECKING:
     from bleak.backends.device import BLEDevice

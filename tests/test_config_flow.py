@@ -12,7 +12,12 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 from yarl import URL
 
-from custom_components.bold.const import API_URL, DOMAIN, OAUTH2_AUTHORIZE, OAUTH2_TOKEN
+from custom_components.bold.boldsmartlock.const import (
+    API_URL,
+    OAUTH2_AUTHORIZE,
+    OAUTH2_TOKEN,
+)
+from custom_components.bold.const import DOMAIN
 
 from .conftest import ACCOUNT_ID, CLIENT_ID
 

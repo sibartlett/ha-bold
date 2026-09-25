@@ -8,9 +8,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 
+from .boldsmartlock import COMMAND_ACTIVATE
 from .const import DOMAIN, ISSUE_AFTER, TROUBLESHOOTING_URL
 from .coordinator import BoldConfigEntry
-from .keys import COMMAND_ACTIVATE
 from .unlock import UnlockMethod
 
 ISSUE_PREFIXES = ("connect_offline_", "lock_out_of_range_", "lock_no_route_")

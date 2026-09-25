@@ -21,11 +21,8 @@ from pytest_homeassistant_custom_component.common import (
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.bold.const import (
-    API_URL,
-    DEVICE_SCAN_INTERVAL,
-    EVENT_SCAN_INTERVAL,
-)
+from custom_components.bold.boldsmartlock.const import API_URL
+from custom_components.bold.const import DEVICE_SCAN_INTERVAL, EVENT_SCAN_INTERVAL
 
 from .conftest import GATEWAY, LOCK, LOCK_ID, event_payload, set_events
 

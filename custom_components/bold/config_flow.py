@@ -11,7 +11,7 @@ from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
-from .api import BoldClient, BoldError
+from .boldsmartlock import BoldClient, BoldError
 from .const import DOMAIN
 
 if TYPE_CHECKING:

@@ -6,9 +6,6 @@ from typing import Final
 DOMAIN: Final = "bold"
 MANUFACTURER: Final = "Bold"
 
-API_URL: Final = "https://api.boldsmartlock.com"
-OAUTH2_AUTHORIZE: Final = "https://auth.boldsmartlock.com/authorize"
-OAUTH2_TOKEN: Final = "https://api.boldsmartlock.com/v2/oauth/token"
 
 DEVICE_SCAN_INTERVAL: Final = timedelta(minutes=10)
 EVENT_SCAN_INTERVAL: Final = timedelta(seconds=30)

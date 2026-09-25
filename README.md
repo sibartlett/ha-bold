@@ -242,6 +242,11 @@ disable it to download the log). Personal details are removed from diagnostics.
 
 ## Development
 
+The Bold API client and Bluetooth protocol live in
+`custom_components/bold/boldsmartlock/`, which doesn't depend on Home Assistant,
+so it can become a standalone library (as Home Assistant core requires). A test
+keeps it that way.
+
 ```sh
 pip install -r requirements_test.txt ruff mypy
 pytest --cov=custom_components.bold

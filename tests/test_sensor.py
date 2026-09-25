@@ -11,7 +11,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
 
-from custom_components.bold.const import API_URL
+from custom_components.bold.boldsmartlock.const import API_URL
 
 from .conftest import GATEWAY, LOCK
 

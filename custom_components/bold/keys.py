@@ -19,14 +19,18 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .api import BoldClient, BoldError, parse_datetime
+from .boldsmartlock import (
+    COMMAND_ACTIVATE,
+    COMMAND_DEACTIVATE,
+    BoldClient,
+    BoldError,
+    parse_datetime,
+)
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
-COMMAND_ACTIVATE = "Activate"
-COMMAND_DEACTIVATE = "Deactivate"
 
 
 @dataclass(frozen=True)

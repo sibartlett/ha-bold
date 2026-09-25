@@ -34,8 +34,9 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
 
-from custom_components.bold.ble import BoldBluetoothError
-from custom_components.bold.const import API_URL, DEVICE_SCAN_INTERVAL
+from custom_components.bold.boldsmartlock.ble import BoldBluetoothError
+from custom_components.bold.boldsmartlock.const import API_URL
+from custom_components.bold.const import DEVICE_SCAN_INTERVAL
 
 from .conftest import (
     ACTIVATE_COMMAND,

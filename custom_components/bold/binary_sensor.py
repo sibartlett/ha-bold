@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .api import BoldDevice
+from .boldsmartlock import BoldDevice
 from .const import CONNECT_OFFLINE_AFTER
 from .coordinator import BoldConfigEntry
 from .entity import BoldEntity, async_add_device_entities
