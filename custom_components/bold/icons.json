@@ -1,0 +1,41 @@
+{
+  "entity": {
+    "event": {
+      "activity": {
+        "default": "mdi:door",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "activated": "mdi:lock-open-variant",
+              "activation_failed": "mdi:lock-alert",
+              "deactivated": "mdi:lock",
+              "tamper": "mdi:alarm-light"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "battery_level": {
+        "default": "mdi:battery",
+        "state": {
+          "excellent": "mdi:battery",
+          "high": "mdi:battery-70",
+          "medium": "mdi:battery-50",
+          "low": "mdi:battery-20",
+          "critical": "mdi:battery-alert-variant-outline"
+        }
+      },
+      "connect_signal": {
+        "default": "mdi:signal",
+        "state": {
+          "excellent": "mdi:signal-cellular-3",
+          "high": "mdi:signal-cellular-3",
+          "medium": "mdi:signal-cellular-2",
+          "low": "mdi:signal-cellular-1",
+          "critical": "mdi:signal-cellular-outline"
+        }
+      }
+    }
+  }
+}

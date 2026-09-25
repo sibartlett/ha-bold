@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import Mock
 
+from aiohttp import ClientConnectionError, ClientResponseError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import pytest
@@ -14,7 +16,9 @@ from custom_components.bold.api import (
     BoldAuthError,
     BoldClient,
     BoldCommandError,
+    BoldConnectionError,
     BoldDevice,
+    BoldError,
     BoldEvent,
     BoldFirmwareOutdatedError,
     BoldForbiddenError,
@@ -235,3 +239,72 @@ async def test_command_errors(
     )
     with pytest.raises(error):
         await _client(hass).remote_deactivation(LOCK_ID)
+
+
+@pytest.mark.parametrize(
+    ("token_error", "error"),
+    [
+        (ClientResponseError(Mock(), (), status=400), BoldAuthError),
+        (ClientResponseError(Mock(), (), status=503), BoldConnectionError),
+        (ClientConnectionError(), BoldConnectionError),
+    ],
+)
+async def test_token_refresh_errors(
+    hass: HomeAssistant, token_error: Exception, error: type[Exception]
+) -> None:
+    """Test failures refreshing the token are translated."""
+
+    async def get_token() -> str:
+        raise token_error
+
+    client = BoldClient(async_get_clientsession(hass), get_token)
+    with pytest.raises(error):
+        await client.get_devices()
+
+
+async def test_connection_error(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test connection errors are translated."""
+    aioclient_mock.get(f"{API_URL}/v2/devices", exc=ClientConnectionError())
+    with pytest.raises(BoldConnectionError):
+        await _client(hass).get_devices()
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "call"),
+    [
+        ("get", "/v1/account", lambda client: client.get_account()),
+        ("get", "/v2/devices", lambda client: client.get_devices()),
+        ("get", "/v2/events", lambda client: client.get_events([1], datetime.now(UTC))),
+        (
+            "post",
+            f"/v1/devices/{LOCK_ID}/remote-activation",
+            lambda client: client.remote_activation(LOCK_ID),
+        ),
+    ],
+)
+async def test_unexpected_responses(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, method, path, call
+) -> None:
+    """Test responses of the wrong shape are rejected."""
+    getattr(aioclient_mock, method)(f"{API_URL}{path}", json="unexpected")
+    with pytest.raises(BoldError, match="Unexpected response"):
+        await call(_client(hass))
+
+
+async def test_get_events_paginates(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test all pages of events are fetched."""
+    first_page = [
+        event_payload(i, "DeviceBoot", "2026-09-24T12:00:00Z") for i in range(PAGE_SIZE)
+    ]
+    aioclient_mock.get(f"{API_URL}/v2/events", params={"offset": 0}, json=first_page)
+    aioclient_mock.get(
+        f"{API_URL}/v2/events",
+        params={"offset": PAGE_SIZE},
+        json=[event_payload(PAGE_SIZE, "DeviceBoot", "2026-09-24T12:00:00Z")],
+    )
+    events = await _client(hass).get_events([1], datetime.now(UTC))
+    assert len(events) == PAGE_SIZE + 1

@@ -48,7 +48,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
 
     async def get_access_token() -> str:
         await session.async_ensure_token_valid()
-        return session.token["access_token"]
+        access_token: str = session.token["access_token"]
+        return access_token
 
     client = BoldClient(async_get_clientsession(hass), get_access_token)
 
@@ -94,13 +95,14 @@ def _async_sync_devices(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
         device_registry, entry.entry_id
     ):
         device_id = _bold_device_id(device_entry)
-        if (device := devices.data.get(device_id)) is None:
+        bold_device = devices.data.get(device_id) if device_id is not None else None
+        if bold_device is None:
             devices.connect_device_ids.pop(device_id, None)
             device_registry.async_update_device(
                 device_entry.id, remove_config_entry_id=entry.entry_id
             )
         elif device_entry.sw_version != (
-            sw_version := device_info(device).get("sw_version")
+            sw_version := device_info(bold_device).get("sw_version")
         ):
             # Firmware was updated, e.g. from the Bold app.
             device_registry.async_update_device(device_entry.id, sw_version=sw_version)

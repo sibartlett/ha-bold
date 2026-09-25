@@ -45,7 +45,7 @@ class OAuth2FlowHandler(
 
     async def async_oauth_create_entry(self, data: dict[str, Any]) -> ConfigFlowResult:
         """Create an entry for the account, or update it when reauthenticating."""
-        access_token = data["token"]["access_token"]
+        access_token: str = data["token"]["access_token"]
 
         async def get_access_token() -> str:
             return access_token

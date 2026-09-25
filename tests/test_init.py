@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.config_entry_oauth2_flow import (
+    ImplementationUnavailableError,
+)
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.bold.const import API_URL, OAUTH2_TOKEN
+from custom_components.bold.const import (
+    API_URL,
+    DEVICE_SCAN_INTERVAL,
+    DOMAIN,
+    OAUTH2_TOKEN,
+)
 
 from .conftest import GATEWAY, LOCK
 
@@ -112,3 +127,37 @@ async def test_token_refresh_rejected_starts_reauth(
     assert mock_config_entry.state is ConfigEntryState.SETUP_ERROR
     flows = hass.config_entries.flow.async_progress()
     assert [flow["context"]["source"] for flow in flows] == [SOURCE_REAUTH]
+
+
+async def test_setup_implementation_unavailable(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test setup retries when the OAuth implementation is unavailable.
+
+    For example when Home Assistant Cloud is not connected yet.
+    """
+    mock_config_entry.add_to_hass(hass)
+    with patch(
+        "custom_components.bold.async_get_config_entry_implementation",
+        side_effect=ImplementationUnavailableError,
+    ):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_foreign_device_removed(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    device_registry: dr.DeviceRegistry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test a device of the entry that isn't a Bold device is removed."""
+    foreign = device_registry.async_get_or_create(
+        config_entry_id=init_integration.entry_id, identifiers={(DOMAIN, "not-bold")}
+    )
+    freezer.tick(DEVICE_SCAN_INTERVAL)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert device_registry.async_get(foreign.id) is None

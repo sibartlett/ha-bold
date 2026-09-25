@@ -304,7 +304,10 @@ class BoldClient:
 
     async def get_account(self) -> dict[str, Any]:
         """Return the account of the current session."""
-        return await self._request("GET", "/v1/account")
+        account = await self._request("GET", "/v1/account")
+        if not isinstance(account, dict):
+            raise BoldError("Unexpected response from GET /v1/account")
+        return account
 
     async def get_devices(self) -> list[BoldDevice]:
         """Return all devices the account has access to."""
