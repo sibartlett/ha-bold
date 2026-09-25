@@ -352,6 +352,46 @@ class BoldClient:
                 return events
             offset += PAGE_SIZE
 
+    async def get_bluetooth_handshakes(
+        self, device_ids: list[int]
+    ) -> list[dict[str, Any]]:
+        """Return Bluetooth handshakes for devices.
+
+        Not part of Bold's public API: this is what the Bold app uses to talk
+        to locks over Bluetooth.
+        """
+        return await self._get_list(
+            "/v2/controller/handshakes",
+            {"deviceIds": ",".join(str(device_id) for device_id in device_ids)},
+        )
+
+    async def get_bluetooth_commands(
+        self, device_ids: list[int], command_types: list[str]
+    ) -> list[dict[str, Any]]:
+        """Return signed Bluetooth commands, e.g. "Activate", for devices.
+
+        Not part of Bold's public API: this is what the Bold app uses to talk
+        to locks over Bluetooth.
+        """
+        return await self._get_list(
+            "/v2/controller/commands",
+            {
+                "deviceIds": ",".join(str(device_id) for device_id in device_ids),
+                "commandTypes": ",".join(command_types),
+            },
+        )
+
+    async def _get_list(
+        self, path: str, params: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Get a list of objects."""
+        response = await self._request("GET", path, params)
+        if not isinstance(response, list) or not all(
+            isinstance(item, dict) for item in response
+        ):
+            raise BoldError(f"Unexpected response from GET {path}")
+        return response
+
     async def remote_activation(self, device_id: int) -> timedelta | None:
         """Activate a device, returning how long it will stay active."""
         response = await self._command(device_id, "remote-activation")

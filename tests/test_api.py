@@ -308,3 +308,23 @@ async def test_get_events_paginates(
     )
     events = await _client(hass).get_events([1], datetime.now(UTC))
     assert len(events) == PAGE_SIZE + 1
+
+
+async def test_get_bluetooth_keys(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test requesting Bluetooth handshakes and commands."""
+    aioclient_mock.get(f"{API_URL}/v2/controller/handshakes", json=[{"deviceId": 1}])
+    aioclient_mock.get(f"{API_URL}/v2/controller/commands", json=[{"deviceId": 1}])
+    client = _client(hass)
+    assert await client.get_bluetooth_handshakes([1, 5]) == [{"deviceId": 1}]
+    assert await client.get_bluetooth_commands([1, 5], ["Activate"]) == [
+        {"deviceId": 1}
+    ]
+    assert aioclient_mock.mock_calls[0][1].query["deviceIds"] == "1,5"
+    assert aioclient_mock.mock_calls[1][1].query["commandTypes"] == "Activate"
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{API_URL}/v2/controller/handshakes", json=["not an object"])
+    with pytest.raises(BoldError, match="Unexpected response"):
+        await client.get_bluetooth_handshakes([1])
