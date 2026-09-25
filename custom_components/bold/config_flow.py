@@ -12,7 +12,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
 from .api import BoldClient, BoldError
-from .const import DOMAIN, OAUTH2_SCOPES
+from .const import DOMAIN
 
 
 class OAuth2FlowHandler(
@@ -26,11 +26,6 @@ class OAuth2FlowHandler(
     def logger(self) -> logging.Logger:
         """Return logger."""
         return logging.getLogger(__name__)
-
-    @property
-    def extra_authorize_data(self) -> dict[str, Any]:
-        """Request the scopes the integration needs."""
-        return {"scope": " ".join(OAUTH2_SCOPES)}
 
     async def async_step_reauth(
         self, entry_data: Mapping[str, Any]

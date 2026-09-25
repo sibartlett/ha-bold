@@ -33,7 +33,9 @@ async def _authorize(
     url = URL(result["url"])
     assert str(url.with_query(None)) == OAUTH2_AUTHORIZE
     assert url.query["client_id"] == CLIENT_ID
-    assert url.query["scope"] == "read activate events"
+    # Bold rejects scopes a client doesn't support; without one, it grants
+    # everything the client (e.g. the Home Assistant Cloud one) allows.
+    assert "scope" not in url.query
     assert url.query["state"] == state
 
     client = await hass_client_no_auth()

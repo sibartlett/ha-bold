@@ -29,9 +29,17 @@ integration polls:
 
 1. Add this repository to HACS as a custom repository (type: Integration) and install it.
 2. Restart Home Assistant.
-3. Add your Bold OAuth client ID and secret under
-   **Settings → Devices & services → ⋮ → Application credentials**.
-4. Add the **Bold Smart Lock** integration and sign in with your Bold account.
+3. Add the **Bold Smart Lock** integration and sign in with your Bold account.
+
+Signing in needs one of:
+
+- **Home Assistant Cloud:** if you're logged in to Nabu Casa, Home Assistant
+  offers its own Bold client, so there's nothing to configure.
+- **Your own Bold OAuth client:** Bold issues custom clients free of charge
+  ([request one](https://sesamsolutions.gitlab.io/public-documentation/integration/oauth-authentication.html)),
+  with `https://my.home-assistant.io/redirect/oauth` as the redirect URI. Add its
+  client ID and secret under
+  **Settings → Devices & services → ⋮ → Application credentials** first.
 
 ## Development
 
