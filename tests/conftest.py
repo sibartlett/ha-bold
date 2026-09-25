@@ -63,7 +63,20 @@ GATEWAY = {
     "id": GATEWAY_ID,
     "name": "Bold Connect",
     "owner": {"organizationId": 7},
-    "model": {"id": 2, "name": "Connect", "type": {"id": 2, "name": "Gateway"}},
+    "model": {
+        "id": 4,
+        "name": "CONNECT",
+        "type": {"id": 2, "name": "Gateway", "description": "Connect"},
+        "description": "Bold Connect",
+    },
+    # A Connect reports itself as its own gateway, with when Bold last heard
+    # from it.
+    "gateway": {
+        "id": GATEWAY_ID,
+        "rssi": 0,
+        "rssiLevel": "Excellent",
+        "lastSeen": "2026-09-24T11:55:00Z",
+    },
     "settings": {},
     "features": {"remoteAccess": False, "eventLog": False},
     "locked": "UNKNOWN",

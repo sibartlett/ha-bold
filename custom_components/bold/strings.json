@@ -55,6 +55,22 @@
           "low": "Low",
           "critical": "Critical"
         }
+      },
+      "connect_signal": {
+        "name": "Bold Connect signal",
+        "state": {
+          "excellent": "Excellent",
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low",
+          "critical": "Critical"
+        }
+      },
+      "connect_signal_strength": {
+        "name": "Bold Connect signal strength"
+      },
+      "last_seen": {
+        "name": "Last seen"
       }
     }
   },

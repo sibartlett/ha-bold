@@ -9,7 +9,9 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
+from .const import CONNECT_OFFLINE_AFTER
 from .coordinator import BoldConfigEntry
 from .entity import BoldEntity
 
@@ -25,11 +27,13 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bold binary sensors."""
     coordinator = entry.runtime_data.devices
-    async_add_entities(
-        BoldBatteryLowSensor(coordinator, device, "battery")
-        for device in coordinator.data.values()
-        if device.is_lock
-    )
+    entities: list[BinarySensorEntity] = []
+    for device in coordinator.data.values():
+        if device.is_lock:
+            entities.append(BoldBatteryLowSensor(coordinator, device, "battery"))
+        elif device.is_gateway:
+            entities.append(BoldConnectOnlineSensor(coordinator, device, "online"))
+    async_add_entities(entities)
 
 
 class BoldBatteryLowSensor(BoldEntity, BinarySensorEntity):
@@ -44,3 +48,16 @@ class BoldBatteryLowSensor(BoldEntity, BinarySensorEntity):
         if (level := self.device.battery_level) is None:
             return None
         return level in LOW_BATTERY_LEVELS
+
+
+class BoldConnectOnlineSensor(BoldEntity, BinarySensorEntity):
+    """Whether a Bold Connect has checked in with Bold recently."""
+
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return whether the Connect was seen recently."""
+        if (last_seen := self.device.gateway_last_seen) is None:
+            return None
+        return dt_util.utcnow() - last_seen < CONNECT_OFFLINE_AFTER

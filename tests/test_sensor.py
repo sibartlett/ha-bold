@@ -45,8 +45,8 @@ async def test_battery(
     assert state.attributes["device_class"] == "battery"
 
     # Gateways have no battery entities.
-    assert len(hass.states.async_entity_ids("sensor")) == 1
-    assert len(hass.states.async_entity_ids("binary_sensor")) == 1
+    assert not hass.states.get("sensor.bold_connect_battery_level")
+    assert not hass.states.get("binary_sensor.bold_connect_battery")
 
 
 @pytest.mark.parametrize(

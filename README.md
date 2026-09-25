@@ -14,6 +14,14 @@ turned by hand for a few seconds. Each lock gets:
 | `event.<name>_activity` | Fires for activations (with the user and method: PIN, button, app…), failed activations such as a wrong PIN, deactivations, and tamper alerts. Only created for locks with the event log feature. |
 | `sensor.<name>_battery_level` | Battery level as Bold reports it: Excellent, High, Medium, Low or Critical. |
 | `binary_sensor.<name>_battery` | Low battery: on when the level is Low or Critical. |
+| `sensor.<name>_bold_connect_signal` | How well the lock reaches its Bold Connect: Excellent, High, Medium, Low or Critical. A raw signal strength in dBm is also available, disabled by default. |
+
+Each Bold Connect is a device too, and the locks it serves are linked to it:
+
+| Entity | What it does |
+|---|---|
+| `binary_sensor.<connect>_connectivity` | Online while Bold has heard from the Connect in the last 30 minutes. |
+| `sensor.<connect>_last_seen` | When Bold last heard from the Connect. |
 
 Locks without a Bold Connect show as unavailable, because they can't be
 activated remotely.

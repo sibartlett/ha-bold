@@ -154,6 +154,9 @@ class BoldDevice:
     remote_access: bool
     event_log: bool
     gateway_id: int | None
+    gateway_rssi: int | None
+    gateway_rssi_level: str | None
+    gateway_last_seen: datetime | None
     raw: dict[str, Any] = field(repr=False, compare=False)
 
     @classmethod
@@ -181,6 +184,13 @@ class BoldDevice:
             remote_access=bool(features.get("remoteAccess")),
             event_log=bool(features.get("eventLog")),
             gateway_id=gateway.get("id"),
+            gateway_rssi=gateway.get("rssi"),
+            gateway_rssi_level=(
+                rssi_level.lower()
+                if isinstance(rssi_level := gateway.get("rssiLevel"), str)
+                else None
+            ),
+            gateway_last_seen=parse_datetime(gateway.get("lastSeen")),
             raw=data,
         )
 
@@ -188,6 +198,11 @@ class BoldDevice:
     def is_lock(self) -> bool:
         """Return whether the device is a lock."""
         return self.type_id == DEVICE_TYPE_LOCK
+
+    @property
+    def is_gateway(self) -> bool:
+        """Return whether the device is a Bold Connect."""
+        return self.type_id == DEVICE_TYPE_GATEWAY
 
     @property
     def update_available(self) -> bool:

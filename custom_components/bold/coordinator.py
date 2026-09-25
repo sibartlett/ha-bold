@@ -57,6 +57,8 @@ class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):
             update_interval=DEVICE_SCAN_INTERVAL,
         )
         self.client = client
+        # Bold Connect device ID -> device registry ID, for linking locks.
+        self.connect_device_ids: dict[int | None, str] = {}
 
     async def _async_update_data(self) -> dict[int, BoldDevice]:
         """Fetch all devices."""

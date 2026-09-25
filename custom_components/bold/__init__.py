@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.config_entry_oauth2_flow import (
     ImplementationUnavailableError,
@@ -20,6 +21,7 @@ from .coordinator import (
     BoldEventCoordinator,
     BoldRuntimeData,
 )
+from .entity import device_info
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -49,6 +51,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
 
     devices = BoldDeviceCoordinator(hass, entry, client)
     await devices.async_config_entry_first_refresh()
+
+    # Register Bold Connects first, so locks can be linked to them.
+    device_registry = dr.async_get(hass)
+    for device in devices.data.values():
+        if device.is_gateway:
+            devices.connect_device_ids[device.id] = device_registry.async_get_or_create(
+                config_entry_id=entry.entry_id, **device_info(device)
+            ).id
 
     events: BoldEventCoordinator | None = None
     if event_device_ids := [
