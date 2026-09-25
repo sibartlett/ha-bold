@@ -65,6 +65,7 @@ Each lock gets:
 | `binary_sensor.<lock>_battery` | Low battery: on when the level is Low or Critical. |
 | `sensor.<lock>_bold_connect_signal` | How well the lock reaches its Bold Connect: Excellent, High, Medium, Low or Critical. |
 | `sensor.<lock>_bold_connect_signal_strength` | The same signal in dBm. Disabled by default. |
+| `sensor.<lock>_bluetooth_signal` | How well Home Assistant hears the lock over Bluetooth, in dBm; unavailable when it can't. Handy for placing an ESPHome Bluetooth proxy. Only when Home Assistant has Bluetooth. |
 | `update.<lock>_firmware` | Whether the lock is on the firmware version Bold requires. |
 | `select.<lock>_unlock_method` | For locks with a Bold Connect, when Home Assistant has Bluetooth: **Prefer Bluetooth** (the default), **Prefer Bold Connect**, **Bluetooth only** or **Bold Connect only**. With a preference, the other way is used when the first fails, and Bluetooth is only tried when Home Assistant hears the lock well (−85 dBm or better). |
 

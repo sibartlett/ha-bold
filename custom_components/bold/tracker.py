@@ -116,6 +116,10 @@ class BoldBluetoothTracker:
             return False
         return min_rssi is None or self._rssi.get(device_id, min_rssi) >= min_rssi
 
+    def rssi(self, device_id: int) -> int | None:
+        """Return how well a reachable device was last heard, in dBm."""
+        return self._rssi.get(device_id) if device_id in self._reachable else None
+
     def ble_device(self, device_id: int) -> BLEDevice | None:
         """Return the Bluetooth device to connect to, if reachable."""
         if not self.enabled or (address := self._addresses.get(device_id)) is None:

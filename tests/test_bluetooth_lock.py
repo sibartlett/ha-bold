@@ -16,6 +16,7 @@ from homeassistant.components.select import (
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_OPTION, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.entity_component import async_update_entity
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -323,3 +324,43 @@ async def test_weak_signal_uses_connect(
     await _set_method(hass, "bluetooth_only")
     await _call(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND]
+
+
+async def test_bluetooth_signal_sensor(
+    hass: HomeAssistant,
+    fake_bluetooth: FakeBluetooth,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test the Bluetooth signal sensor follows advertisements, without polling Bold."""
+    entity_id = "sensor.front_door_bluetooth_signal"
+    tracker = init_integration.runtime_data.bluetooth
+    tracker._rssi[LOCK_ID] = -88  # noqa: SLF001
+    # Home Assistant polls it every 30 seconds.
+    await async_update_entity(hass, entity_id)
+    state = hass.states.get(entity_id)
+    assert state.state == "-88"
+    assert state.attributes["unit_of_measurement"] == "dBm"
+
+    # Reading the signal doesn't call Bold's API. Move past the cooldown on
+    # refresh requests first, so a refresh would go through straight away.
+    frozen_time.tick(60)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    mock_api.mock_calls.clear()
+    await async_update_entity(hass, entity_id)
+    await hass.async_block_till_done()
+    assert mock_api.call_count == 0
+
+    # Out of range, it's unavailable straight away.
+    tracker.async_mark_unreachable(LOCK_ID)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == STATE_UNAVAILABLE
+
+
+async def test_no_bluetooth_signal_sensor_without_bluetooth(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Test Home Assistant without Bluetooth gets no Bluetooth signal sensor."""
+    assert hass.states.get("sensor.front_door_bluetooth_signal") is None

@@ -71,6 +71,9 @@
           "critical": "Critical"
         }
       },
+      "bluetooth_signal": {
+        "name": "Bluetooth signal"
+      },
       "connect_signal": {
         "name": "Bold Connect signal",
         "state": {
