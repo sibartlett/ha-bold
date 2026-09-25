@@ -21,7 +21,6 @@ from .conftest import GATEWAY, LOCK, event_payload, set_events
 
 IDLE = "sensor.front_door_battery_voltage"
 UNDER_LOAD = "sensor.front_door_battery_voltage_under_load"
-TEMPERATURE = "sensor.front_door_temperature"
 
 # Shaped like the debug event a Bold Classic sends when it's activated.
 DEBUG_EVENT = event_payload(
@@ -112,15 +111,14 @@ async def test_daily_status(
     mock_api: AiohttpClientMocker,
     frozen_time: FrozenDateTimeFactory,
 ) -> None:
-    """Test the voltages and temperature from the daily status."""
+    """Test the voltages from the daily status."""
     set_events(mock_api, [_status(21, "2026-09-24T12:00:10Z", 3061, 2945, 18)])
     await _poll(hass, frozen_time)
     assert hass.states.get(IDLE).state == "3.061"
     assert hass.states.get(UNDER_LOAD).state == "2.945"
-    state = hass.states.get(TEMPERATURE)
-    assert state.state == "18.0"
-    assert state.attributes["unit_of_measurement"] == "°C"
-    assert state.attributes["device_class"] == "temperature"
+    # The daily status's average temperature isn't a current reading, so it
+    # isn't exposed.
+    assert hass.states.get("sensor.front_door_temperature") is None
 
 
 async def test_status_without_load_measurement(
@@ -136,7 +134,6 @@ async def test_status_without_load_measurement(
     await _poll(hass, frozen_time)
     assert hass.states.get(IDLE).state == "3.073"
     assert hass.states.get(UNDER_LOAD).state == "2.945"
-    assert hass.states.get(TEMPERATURE).state == "-2.0"
 
 
 async def test_other_events_ignored(
@@ -234,10 +231,9 @@ async def test_voltage_from_history(
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    # The latest of each: at rest from the debug event, the rest from the status.
+    # The latest of each: at rest from the debug event, under load from the status.
     assert hass.states.get(IDLE).state == "3.063"
     assert hass.states.get(UNDER_LOAD).state == "2.945"
-    assert hass.states.get(TEMPERATURE).state == "18.0"
     history_call = next(
         call for call in aioclient_mock.mock_calls if "type" in call[1].query
     )

@@ -18,7 +18,6 @@ from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
     UnitOfElectricPotential,
-    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -219,13 +218,6 @@ def voltage_under_load(event: BoldEvent) -> float | None:
     return None
 
 
-def average_temperature(event: BoldEvent) -> float | None:
-    """Return the lock's average temperature, from the daily status."""
-    if event.type == "DeviceStatus":
-        return _number(event.raw.get("averageTemperature"))
-    return None
-
-
 @dataclass(frozen=True, kw_only=True)
 class BoldReportedSensorDescription(SensorEntityDescription):
     """A value Bold locks report in their event log."""
@@ -253,14 +245,6 @@ REPORTED_SENSORS: tuple[BoldReportedSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
         value_fn=voltage_under_load,
-    ),
-    BoldReportedSensorDescription(
-        key="temperature",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=average_temperature,
     ),
 )
 
