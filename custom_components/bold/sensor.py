@@ -2,21 +2,28 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 import logging
 
 from homeassistant.components.sensor import (
+    RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import SIGNAL_STRENGTH_DECIBELS_MILLIWATT, EntityCategory
+from homeassistant.const import (
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
+    UnitOfElectricPotential,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import BoldDevice
-from .coordinator import BoldConfigEntry, BoldRuntimeData
-from .entity import BoldEntity, async_add_device_entities
+from .api import BoldDevice, BoldEvent
+from .coordinator import BoldConfigEntry, BoldEventCoordinator, BoldRuntimeData
+from .entity import BoldEntity, async_add_device_entities, device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +50,14 @@ async def async_setup_entry(
         entities: list[SensorEntity] = []
         if device.is_lock and data.bluetooth.enabled:
             entities.append(BoldBluetoothSignalSensor(data, device))
+        if device.is_lock and device.event_log:
+            entities.extend(
+                BoldBatteryVoltageSensor(data.events, device, key, voltage)
+                for key, voltage in (
+                    ("battery_voltage", idle_voltage),
+                    ("battery_voltage_under_load", voltage_under_load),
+                )
+            )
         if device.is_lock:
             entities.append(
                 BoldBatteryLevelSensor(coordinator, device, "battery_level")
@@ -166,3 +181,90 @@ class BoldBluetoothSignalSensor(BoldEntity, SensorEntity):
     def native_value(self) -> int | None:
         """Return the signal strength."""
         return self._tracker.rssi(self.device_id)
+
+
+def _millivolts(value: object) -> float | None:
+    """Convert a voltage in millivolts, as Bold reports it, to volts."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+        return None
+    return round(value / 1000, 3)
+
+
+def idle_voltage(event: BoldEvent) -> float | None:
+    """Return the battery voltage at rest, from a status or debug event."""
+    if event.type == "DeviceStatus":
+        return _millivolts(event.raw.get("voltageIdle"))
+    if event.type == "DeviceDebug" and isinstance(body := event.raw.get("body"), dict):
+        return _millivolts(body.get("voltageIdle"))
+    return None
+
+
+def voltage_under_load(event: BoldEvent) -> float | None:
+    """Return the lowest battery voltage while the motor ran.
+
+    Status events report it; debug events of an activation sample the voltage
+    as the motor runs (voltage0, voltage1, ...).
+    """
+    if event.type == "DeviceStatus":
+        return _millivolts(event.raw.get("voltageUnderLoad"))
+    if event.type == "DeviceDebug" and isinstance(body := event.raw.get("body"), dict):
+        samples = [
+            volts
+            for key, value in body.items()
+            if key.startswith("voltage")
+            and key[len("voltage") :].isdigit()
+            and (volts := _millivolts(value)) is not None
+        ]
+        return min(samples, default=None)
+    return None
+
+
+class BoldBatteryVoltageSensor(CoordinatorEntity[BoldEventCoordinator], RestoreSensor):
+    """A battery voltage of a Bold lock, reported with its activity.
+
+    Locks report their voltage when they're used, so the last reading is
+    kept across restarts.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(
+        self,
+        coordinator: BoldEventCoordinator,
+        device: BoldDevice,
+        key: str,
+        voltage: Callable[[BoldEvent], float | None],
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self.device_id = device.id
+        self._voltage = voltage
+        self._attr_translation_key = key
+        self._attr_unique_id = f"{device.id}_{key}"
+        self._attr_device_info = device_info(device)
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last reading, and pick up any from recent events."""
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            self._attr_native_value = last.native_value
+        self._update_from(self.coordinator.recent_events)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Pick up readings from new events."""
+        self._update_from(self.coordinator.data or [])
+        super()._handle_coordinator_update()
+
+    def _update_from(self, events: Iterable[BoldEvent]) -> None:
+        for event in events:
+            if (
+                event.device_id == self.device_id
+                and (volts := self._voltage(event)) is not None
+            ):
+                self._attr_native_value = volts

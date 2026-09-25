@@ -71,6 +71,12 @@
           "critical": "Critical"
         }
       },
+      "battery_voltage": {
+        "name": "Battery voltage"
+      },
+      "battery_voltage_under_load": {
+        "name": "Battery voltage under load"
+      },
       "bluetooth_signal": {
         "name": "Bluetooth signal"
       },
