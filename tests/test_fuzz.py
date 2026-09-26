@@ -6,6 +6,8 @@ contain, parsing must either succeed or be rejected cleanly, never crash.
 """
 
 import asyncio
+import base64
+from datetime import UTC, datetime, timedelta, timezone
 import os
 from typing import Any
 
@@ -23,6 +25,13 @@ from custom_components.bold.boldsmartlock.ble import (
     PACKET_EVENT,
     BoldBleSession,
     encode_packet,
+)
+from custom_components.bold.keys import (
+    BoldLockKeys,
+    BoldSecret,
+    decode_keys,
+    encode_keys,
+    parse_keys,
 )
 
 from .test_ble import ACTIVATE_COMMAND, HANDSHAKE_KEY, HANDSHAKE_PAYLOAD, FakeLock
@@ -251,3 +260,90 @@ def test_any_command_acknowledgement(ack: bytes) -> None:
 
 async def _ignore_write(packet: bytes) -> None:
     """Write nowhere."""
+
+
+# Bluetooth keys: from Bold's cloud, and as stored between restarts.
+BASE64 = st.binary(max_size=24).map(lambda data: base64.b64encode(data).decode())
+TIMES = st.datetimes(
+    min_value=datetime(2000, 1, 1),
+    max_value=datetime(2100, 1, 1),
+    timezones=st.sampled_from([UTC, timezone(timedelta(hours=10))]),
+)
+KEY_VALUES = (
+    SCALARS
+    | BASE64
+    | TIMES.map(datetime.isoformat)
+    # Without a time zone: Bold's are UTC.
+    | TIMES.map(lambda time: time.replace(tzinfo=None).isoformat())
+    | st.sampled_from(["Activate", "Deactivate", 1, 2])
+)
+KEY_JSON: st.SearchStrategy[Any] = st.recursive(
+    KEY_VALUES,
+    lambda children: (
+        st.lists(children, max_size=3)
+        | st.dictionaries(
+            st.sampled_from(
+                [
+                    "deviceId",
+                    "commandType",
+                    "payload",
+                    "handshakeKey",
+                    "expiration",
+                    "locks",
+                    "1",
+                    "handshake_key",
+                    "handshake_payload",
+                    "commands",
+                    "value",
+                    "expires",
+                ]
+            ),
+            children,
+            max_size=6,
+        )
+    ),
+    max_leaves=30,
+)
+
+
+def _usable(keys: dict[int, BoldLockKeys]) -> None:
+    """Check keys can be used without raising, whatever they came from."""
+    now = datetime.now(UTC)
+    for lock in keys.values():
+        for command_type in (*lock.commands, "Activate"):
+            command = lock.command(command_type, now)
+            assert command is None or isinstance(command, bytes)
+
+
+@given(st.lists(KEY_JSON, max_size=4), st.lists(KEY_JSON, max_size=4))
+def test_keys_from_any_response(handshakes: list[Any], commands: list[Any]) -> None:
+    """Test any keys from Bold are parsed or skipped, and survive being stored."""
+    keys = parse_keys(handshakes, commands)
+    _usable(keys)
+    assert decode_keys(encode_keys(keys)) == keys
+
+
+@given(KEY_JSON)
+def test_keys_from_any_storage(stored: Any) -> None:
+    """Test any stored data is loaded or skipped, without raising."""
+    _usable(decode_keys(stored))
+
+
+SECRETS = st.builds(BoldSecret, st.binary(max_size=64), TIMES)
+
+
+@given(
+    st.dictionaries(
+        st.integers(0, 2**40),
+        st.builds(
+            BoldLockKeys,
+            SECRETS,
+            SECRETS,
+            st.dictionaries(st.text(max_size=12), SECRETS, max_size=3),
+        ),
+        max_size=3,
+    )
+)
+def test_keys_stored_and_loaded(keys: dict[int, BoldLockKeys]) -> None:
+    """Test any keys come back unchanged after being stored."""
+    assert decode_keys(encode_keys(keys)) == keys
