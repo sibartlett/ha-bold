@@ -158,7 +158,6 @@ class BoldDevice:
     actual_firmware_version: int | None
     required_firmware_version: int | None
     battery_level: str | None
-    battery_last_measurement: datetime | None
     activation_time: timedelta | None
     is_active_until: datetime | None
     # Whether the lock reports its bolt position (an upgraded lock, with it
@@ -195,7 +194,6 @@ class BoldDevice:
             battery_level=(
                 battery_level.lower() if isinstance(battery_level, str) else None
             ),
-            battery_last_measurement=parse_datetime(data.get("batteryLastMeasurement")),
             activation_time=parse_duration(settings.get("activationTime")),
             is_active_until=parse_datetime(data.get("isActiveUntil")),
             reports_bolt=bool(features.get("lockedStatus"))
