@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 (unreleased)
+## 1.0.0 (2026-09-26)
 
 The first release: a new integration for Bold Smart Locks, written from
 scratch.

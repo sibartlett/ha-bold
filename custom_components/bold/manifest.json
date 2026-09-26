@@ -29,5 +29,5 @@
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/sibartlett/ha-bold/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "1.0.0"
 }
