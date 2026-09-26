@@ -21,6 +21,7 @@ from .conftest import (
     LOCK_ID,
     advance,
     call_lock,
+    count_calls,
     event_payload,
     set_events,
     setup_integration,
@@ -154,6 +155,61 @@ async def test_bolt_from_device_poll(
     aioclient_mock.get(f"{API_URL}/v2/events", json=[])
     await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+async def test_locked_status_turned_on(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test the bolt shows straight away once locked status is turned on.
+
+    Only the next device poll, up to 10 minutes later, would say it's on; the
+    first bolt event prompts checking now.
+    """
+    await _setup(
+        hass,
+        mock_config_entry,
+        aioclient_mock,
+        {
+            **UPGRADED_LOCK,
+            "settings": {**UPGRADED_LOCK["settings"], "lockedStatus": False},
+            "locked": "UNKNOWN",
+            "lastLocked": None,
+        },
+    )
+    assert hass.states.get(LOCK_ENTITY).attributes[ATTR_ASSUMED_STATE]
+
+    # Locked status is turned on in the Bold app, and the lock set to unlocked.
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"{API_URL}/v2/devices",
+        json=[
+            {
+                **UPGRADED_LOCK,
+                "locked": "UNLOCKED",
+                "lastLocked": "2026-09-24T12:00:10Z",
+            },
+            GATEWAY,
+        ],
+    )
+    aioclient_mock.get(
+        f"{API_URL}/v2/events",
+        json=[_bolt_event(30, "2026-09-24T12:00:10Z", "Unlocked")],
+    )
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    state = hass.states.get(LOCK_ENTITY)
+    assert state.state == LockState.UNLOCKED
+    assert not state.attributes.get(ATTR_ASSUMED_STATE)
+    assert count_calls(aioclient_mock, "/v2/devices") == 1
+
+    # Once it's on, bolt events don't need a check.
+    set_events(aioclient_mock, [_bolt_event(31, "2026-09-24T12:00:40Z", "Locked")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+    assert count_calls(aioclient_mock, "/v2/devices") == 0
 
 
 async def test_unlock_shows_unlocking_until_turned(

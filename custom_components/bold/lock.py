@@ -347,6 +347,14 @@ class BoldLock(BoldEntity, LockEntity):
         """Apply an event from the event log, returning whether it applied."""
         if event.type == BoldEventType.LOCKED:
             self._update_bolt(event.bolt_locked, event.time)
+            if event.bolt_locked is not None and not self.device.reports_bolt:
+                # Locked status was probably just turned on in the Bold app:
+                # check now, rather than at the next device poll.
+                self.coordinator.config_entry.async_create_task(
+                    self.hass,
+                    self.coordinator.async_request_refresh(),
+                    "Refresh Bold devices",
+                )
             return True
         if event.type == BoldEventType.ACTIVATION and event.successful:
             until = event.time + (event.activation_time or self._activation_time)
