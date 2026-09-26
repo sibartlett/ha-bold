@@ -1,7 +1,5 @@
 """Fixtures for the Bold integration tests."""
 
-from __future__ import annotations
-
 import asyncio
 import base64
 from collections.abc import Callable, Coroutine, Generator
@@ -325,6 +323,7 @@ class FakeBluetooth:
     """Stands in for Home Assistant's Bluetooth stack and the lock's radio."""
 
     def __init__(self) -> None:
+        """Start with the test lock in range, and every command succeeding."""
         self.reachable: set[int] = {LOCK_ID}
         self.ble_device = object()
         self.sent: list[bytes] = []
@@ -345,6 +344,7 @@ class FakeBluetooth:
         timeout: float,
         disconnect_later: Callable[[Coroutine[Any, Any, None]], None] | None = None,
     ) -> int:
+        """Check the keys, and record the command, like async_send_command."""
         assert ble_device is self.ble_device
         assert handshake_key == HANDSHAKE_KEY
         assert handshake_payload == HANDSHAKE_PAYLOAD

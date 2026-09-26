@@ -1,7 +1,5 @@
 """Tests for catching up on events that locks upload late."""
 
-from __future__ import annotations
-
 from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import patch
@@ -15,9 +13,7 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock import BoldEvent, parse_datetime
 from custom_components.bold.boldsmartlock.const import API_URL
@@ -33,10 +29,12 @@ class FakeEventLog:
     """Bold's event log: events show up once uploaded, filtered by when they happened."""
 
     def __init__(self) -> None:
+        """Start with no events."""
         self.events: list[tuple[datetime, dict[str, Any]]] = []
         self.requested_since: list[tuple[datetime, datetime]] = []
 
     def add(self, event_id: int, happened: datetime, uploaded: datetime) -> None:
+        """Add an activation that happened at one time, and was uploaded later."""
         self.events.append(
             (
                 uploaded,
@@ -56,6 +54,7 @@ class FakeEventLog:
         since: datetime,
         event_types: list[str] | None = None,
     ) -> list[BoldEvent]:
+        """Return the events uploaded so far that happened since then."""
         now = dt_util.utcnow()
         if event_types is None:
             self.requested_since.append((now, since))

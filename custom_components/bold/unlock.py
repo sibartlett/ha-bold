@@ -1,7 +1,5 @@
 """How each Bold lock is unlocked: over Bluetooth or through a Bold Connect."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from enum import StrEnum
 

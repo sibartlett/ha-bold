@@ -1,7 +1,5 @@
 """Keep the boldsmartlock package independent, so it can become a library."""
 
-from __future__ import annotations
-
 import ast
 from pathlib import Path
 

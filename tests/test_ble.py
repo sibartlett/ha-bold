@@ -1,7 +1,5 @@
 """Tests for the Bold Bluetooth protocol."""
 
-from __future__ import annotations
-
 import os
 
 import pytest
@@ -39,6 +37,7 @@ class FakeLock:
         event_first: bool = False,
         reject_handshake: bool = False,
     ) -> None:
+        """Set how the lock answers: its result code, and how it sends replies."""
         self.session: BoldBleSession | None = None
         self.result = result
         self.activation_time = activation_time
@@ -61,6 +60,7 @@ class FakeLock:
             self.session.data_received(data[i : i + self.chunk_size])
 
     async def write(self, packet: bytes) -> None:
+        """Receive a packet from the client, and reply as a lock would."""
         packet_type = packet[0]
         size = int.from_bytes(packet[1:3], "little")
         payload = packet[3:]

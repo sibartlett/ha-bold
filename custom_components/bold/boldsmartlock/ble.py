@@ -29,8 +29,6 @@ The protocol is ported from homebridge-bold-ble
     DEALINGS IN THE SOFTWARE.
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass

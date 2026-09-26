@@ -1,7 +1,5 @@
 """Repair issues for problems users can fix themselves."""
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from datetime import datetime
 from itertools import chain

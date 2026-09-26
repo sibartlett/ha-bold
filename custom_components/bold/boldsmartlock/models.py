@@ -1,7 +1,5 @@
 """Bold devices and events, as the Bold API returns them."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum

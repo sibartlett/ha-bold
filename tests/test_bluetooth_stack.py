@@ -1,7 +1,5 @@
 """Tests for the parts of Bluetooth support that touch the radio and storage."""
 
-from __future__ import annotations
-
 import sys
 from types import SimpleNamespace
 from typing import Any
@@ -33,12 +31,7 @@ from custom_components.bold.keys import BoldBluetoothKeys
 from custom_components.bold.tracker import BoldBluetoothTracker
 
 from .conftest import LOCK_ID, mock_bluetooth_keys
-from .test_ble import (
-    ACTIVATE_COMMAND,
-    HANDSHAKE_KEY,
-    HANDSHAKE_PAYLOAD,
-    FakeLock,
-)
+from .test_ble import ACTIVATE_COMMAND, HANDSHAKE_KEY, HANDSHAKE_PAYLOAD, FakeLock
 
 ADDRESS = "AA:BB:CC:00:00:01"
 LOCK_ADVERTISEMENT = BluetoothServiceInfo(
@@ -56,10 +49,12 @@ class FakeBleakClient:
     """A connected Bleak client, wired to a simulated lock."""
 
     def __init__(self, lock: FakeLock) -> None:
+        """Connect to the simulated lock."""
         self.lock = lock
         self.disconnected = False
 
     async def start_notify(self, uuid: str, callback: Any) -> None:
+        """Pass the lock's replies to the callback."""
         assert uuid == UART_TX_UUID
         # The simulated lock replies straight into the notification callback.
         session = BoldBleSession(self.lock.write)
@@ -67,11 +62,13 @@ class FakeBleakClient:
         self.lock.session = session
 
     async def write_gatt_char(self, uuid: str, data: bytes, response: bool) -> None:
+        """Send a packet to the lock."""
         assert uuid == UART_RX_UUID
         assert response
         await self.lock.write(data)
 
     async def disconnect(self) -> None:
+        """Disconnect from the lock."""
         self.disconnected = True
 
 

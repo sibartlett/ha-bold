@@ -1,7 +1,5 @@
 """Tests for setting up the Bold integration."""
 
-from __future__ import annotations
-
 from unittest.mock import patch
 
 from freezegun.api import FrozenDateTimeFactory

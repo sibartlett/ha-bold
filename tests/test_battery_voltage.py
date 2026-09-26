@@ -1,7 +1,5 @@
 """Tests for the Bold battery voltage sensors."""
 
-from __future__ import annotations
-
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, State
@@ -10,9 +8,7 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     mock_restore_cache_with_extra_data,
 )
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import EVENT_SCAN_INTERVAL

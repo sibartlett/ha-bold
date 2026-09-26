@@ -6,8 +6,6 @@ webhook, the integration keeps polling. Polling also continues as a safety
 net, and speeds up again if the webhook stops delivering.
 """
 
-from __future__ import annotations
-
 import contextlib
 import hmac
 from http import HTTPStatus
@@ -20,12 +18,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 
-from .boldsmartlock import (
-    WEBHOOK_SECRET_HEADER,
-    BoldClient,
-    BoldError,
-    BoldEvent,
-)
+from .boldsmartlock import WEBHOOK_SECRET_HEADER, BoldClient, BoldError, BoldEvent
 from .const import DOMAIN, PUSHED_EVENT_TYPES
 from .coordinator import BoldConfigEntry
 

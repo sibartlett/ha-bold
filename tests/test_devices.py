@@ -1,7 +1,5 @@
 """Tests for Bold devices being added and removed."""
 
-from __future__ import annotations
-
 import copy
 
 from freezegun.api import FrozenDateTimeFactory
@@ -9,12 +7,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.setup import async_setup_component
 import pytest
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-)
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.bold.boldsmartlock.const import API_URL
@@ -24,14 +18,7 @@ from custom_components.bold.const import (
     EVENT_SCAN_INTERVAL,
 )
 
-from .conftest import (
-    GATEWAY,
-    GATEWAY_ID,
-    LOCK,
-    LOCK_ID,
-    advance,
-    event_payload,
-)
+from .conftest import GATEWAY, GATEWAY_ID, LOCK, LOCK_ID, advance, event_payload
 
 pytestmark = pytest.mark.usefixtures("frozen_time")
 

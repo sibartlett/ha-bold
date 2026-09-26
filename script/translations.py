@@ -18,6 +18,7 @@ KEY_RE = re.compile(r"\[%key:([a-z0-9_:]+)%\]")
 
 
 def lookup(key: str) -> str:
+    """Return Home Assistant's common string for a [%key:...%] reference."""
     node = COMMON
     for part in key.split("::"):
         node = node[part]
@@ -25,6 +26,7 @@ def lookup(key: str) -> str:
 
 
 def resolve(value):
+    """Resolve the [%key:...%] references in a string, or a dict of them."""
     if isinstance(value, dict):
         return {k: resolve(v) for k, v in value.items()}
     return KEY_RE.sub(lambda m: lookup(m.group(1)), value)

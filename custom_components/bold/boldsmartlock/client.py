@@ -4,8 +4,6 @@ Only depends on aiohttp, so it can be split out into a library later.
 API reference: https://apidoc.boldsmartlock.com/
 """
 
-from __future__ import annotations
-
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from http import HTTPStatus

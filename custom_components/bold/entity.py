@@ -1,7 +1,5 @@
 """Base entity for the Bold integration."""
 
-from __future__ import annotations
-
 from collections.abc import Callable, Iterable
 
 from homeassistant.core import callback

@@ -1,22 +1,14 @@
 """Tests for the Bold lock platform."""
 
-from __future__ import annotations
-
 from datetime import timedelta
 
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.components.lock import (
-    SERVICE_LOCK,
-    SERVICE_UNLOCK,
-    LockState,
-)
+from homeassistant.components.lock import SERVICE_LOCK, SERVICE_UNLOCK, LockState
 from homeassistant.const import ATTR_ASSUMED_STATE, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 import pytest
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL

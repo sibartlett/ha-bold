@@ -3,8 +3,6 @@
 Update them with `pytest --snapshot-update`, and review the diff.
 """
 
-from __future__ import annotations
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest

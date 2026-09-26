@@ -4,8 +4,6 @@ Bold firmware is installed from the Bold app, over Bluetooth, so these entities
 only report whether a device is on the firmware version Bold requires.
 """
 
-from __future__ import annotations
-
 from homeassistant.components.update import UpdateDeviceClass, UpdateEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback

@@ -1,7 +1,5 @@
 """Tests for Bold pushing events to a webhook."""
 
-from __future__ import annotations
-
 from datetime import timedelta
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,9 +15,7 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 from custom_components.bold.boldsmartlock.const import API_URL

@@ -1,27 +1,17 @@
 """Tests for the Bold event platform."""
 
-from __future__ import annotations
-
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.event import ATTR_EVENT_TYPE
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 import pytest
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import EVENT_SCAN_INTERVAL
 
-from .conftest import (
-    GATEWAY,
-    LOCK,
-    advance,
-    event_payload,
-    set_events,
-)
+from .conftest import GATEWAY, LOCK, advance, event_payload, set_events
 
 pytestmark = pytest.mark.usefixtures("frozen_time")
 

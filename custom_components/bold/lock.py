@@ -8,8 +8,6 @@ unlocking while it's activated with the bolt still thrown. Other locks show as
 unlocked while activated and locked otherwise, as an assumed state.
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections.abc import Coroutine
 from datetime import datetime, timedelta

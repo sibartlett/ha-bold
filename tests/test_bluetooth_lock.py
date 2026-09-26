@@ -1,7 +1,5 @@
 """Tests for unlocking Bold locks over Bluetooth."""
 
-from __future__ import annotations
-
 import asyncio
 from datetime import UTC, datetime, timedelta
 
@@ -31,9 +29,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
     mock_restore_cache,
 )
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock import COMMAND_ACTIVATE, COMMAND_DEACTIVATE
 from custom_components.bold.boldsmartlock.ble import BoldBluetoothError

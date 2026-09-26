@@ -1,7 +1,5 @@
 """Event platform for the Bold integration."""
 
-from __future__ import annotations
-
 from homeassistant.components.event import EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback

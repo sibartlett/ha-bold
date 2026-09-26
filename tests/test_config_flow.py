@@ -1,7 +1,5 @@
 """Tests for the Bold config flow."""
 
-from __future__ import annotations
-
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType

@@ -5,8 +5,6 @@ commands (valid for about a year). They're stored, so locks can be unlocked
 over Bluetooth while Bold's cloud is unreachable.
 """
 
-from __future__ import annotations
-
 import base64
 import binascii
 from collections.abc import Callable

@@ -1,7 +1,5 @@
 """Tracks which Bold locks Home Assistant can reach over Bluetooth."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from datetime import datetime
 import logging

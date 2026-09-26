@@ -1,7 +1,5 @@
 """Tests for discovering Bold devices."""
 
-from __future__ import annotations
-
 from fnmatch import fnmatch
 import json
 from pathlib import Path

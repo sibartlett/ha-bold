@@ -1,7 +1,5 @@
 """Errors raised by the Bold Smart Lock client."""
 
-from __future__ import annotations
-
 
 class BoldError(Exception):
     """Base error for the Bold API."""

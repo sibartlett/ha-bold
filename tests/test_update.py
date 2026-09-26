@@ -1,7 +1,5 @@
 """Tests for the Bold update platform."""
 
-from __future__ import annotations
-
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.update import (
     ATTR_INSTALLED_VERSION,
@@ -21,19 +19,12 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import DEVICE_SCAN_INTERVAL, DOMAIN
 
-from .conftest import (
-    GATEWAY,
-    LOCK,
-    LOCK_ID,
-    setup_integration,
-)
+from .conftest import GATEWAY, LOCK, LOCK_ID, setup_integration
 
 ENTITY_ID = "update.front_door_firmware"
 
