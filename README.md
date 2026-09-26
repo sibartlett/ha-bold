@@ -13,7 +13,7 @@ firmware.
 
 | Device | Support |
 |---|---|
-| Bold Smart Cylinder | ✅ Tested with the Bold Classic (SX33); other cylinder models should work the same way. |
+| Bold Smart Cylinder | ✅ Tested with the Bold Classic (SX33), with and without the Classic Upgrade, which lets it report whether it's locked. Other cylinder models should work the same way. |
 | Bold Connect | ✅ Unlocks locks from anywhere, through Bold's cloud. |
 | Bold Clicker (key fob) | ➖ Ignored. Its activity shows up on the lock it opens. |
 
@@ -27,6 +27,8 @@ Home Assistant can unlock a lock in two ways:
   locks without a Bold Connect.
 
 ## Installation
+
+Requires Home Assistant 2026.8 or later.
 
 1. In HACS, add `https://github.com/sibartlett/ha-bold` as a custom repository
    (type: Integration), then download **Bold Smart Lock**.
@@ -87,6 +89,18 @@ Each Bold Connect is a device too, and the locks it serves are linked to it:
 Locks and Bold Connects added to your Bold account appear automatically, and
 ones removed from it are removed from Home Assistant.
 
+To see whether a lock is locked, it needs the Classic Upgrade (or a model that
+reports its bolt), with **locked status** turned on in the Bold app. Then set
+or turn the lock once: until then Bold doesn't know its position. Home
+Assistant switches over within seconds.
+
+The activity entity's `event_type` is one of `activated`, `activation_failed`,
+`deactivated`, `tamper`, `locked` or `unlocked`. Its attributes say when it
+happened (`time`) and who did it (`user`, when Bold knows); activations and
+deactivations add the `method` (e.g. `Pin`, `Button`, `Ble`) and whether it
+was `remote`, activations their `result`, and tamper alerts the `tamper_type`
+(`vibration`, `rotations` or `faulty_pin`).
+
 ## How data is updated
 
 **Pushed within seconds**, when Home Assistant is reachable from the internet
@@ -137,9 +151,10 @@ triggers:
     entity_id: event.front_door_activity
     not_from: [unavailable, unknown]
 conditions:
-  - condition: template
-    value_template: >
-      {{ trigger.to_state.attributes.event_type in ["activation_failed", "tamper"] }}
+  - condition: state
+    entity_id: event.front_door_activity
+    attribute: event_type
+    state: [activation_failed, tamper]
 actions:
   - action: notify.notify
     data:
@@ -186,8 +201,9 @@ actions:
 
 ## Known limitations
 
-- **Bolt position needs an upgraded lock.** Other locks' state shows whether
-  they're _activated_, not whether the bolt is thrown, as an assumed state.
+- **Bolt position needs the Classic Upgrade** (or a lock that reports it),
+  with locked status on. Other locks' state shows whether they're
+  _activated_, not whether the bolt is thrown, as an assumed state.
   Bolt changes appear within seconds with pushes, or about 30 seconds without.
 - **Lock can't throw the bolt.** Bold locks are turned by hand; **Lock** only
   ends an activation early.
@@ -215,9 +231,10 @@ be unlocked from Home Assistant at all. Repairs clear themselves once the
 problem is gone. You can ignore one, e.g. for a lock that's only in range some
 of the time; it's raised again if the problem comes back after being fixed.
 
-- **A lock is unavailable.** It has no Bold Connect assigned in the Bold app, or
-  the integration can't reach Bold. Check the lock's Bold Connect signal, and
-  that the Connect is online.
+- **A lock is unavailable.** Home Assistant has no way to reach it: no Bold
+  Connect it can use (none assigned in the Bold app, or Bold can't be
+  reached), and it isn't in Bluetooth range. Check the lock's Bold Connect
+  signal and that the Connect is online, or its Bluetooth signal.
 - **Unlocking fails with "No Bold Connect is available".** The Connect is
   offline or out of range of the lock. Check its power and Wi-Fi, and its
   `connectivity` sensor.
@@ -251,10 +268,9 @@ disable it to download the log). Personal details are removed from diagnostics.
 
 1. Go to **Settings → Devices & services → Bold Smart Lock**, open the **⋮**
    menu and choose **Delete**. This also removes the webhook the integration
-   registered with Bold.
+   registered with Bold, and deletes the Bluetooth keys stored for your locks.
 2. To remove the integration's files too, remove **Bold Smart Lock** in HACS and
    restart Home Assistant.
-   This also deletes the Bluetooth keys stored for your locks.
 3. If you added your own Bold OAuth client, you can remove it under
    **Settings → Devices & services → ⋮ → Application credentials**.
 
@@ -274,15 +290,18 @@ pytest --snapshot-update  # after changing entities or diagnostics; review the d
 HYPOTHESIS_PROFILE=thorough pytest tests/test_fuzz.py  # after changing parsing
 ```
 
-CI also runs the tests against the oldest Home Assistant version in
-`hacs.json`.
+CI requires 100% test coverage, and also runs the tests against the oldest
+Home Assistant version in `hacs.json`.
 
 ## Security
 
 The Bluetooth keys are stored in Home Assistant's `.storage` folder, like your
-Bold sign-in. Anyone who can read that folder (or a backup of it) could unlock
-your locks over Bluetooth, from within Bluetooth range, until the keys expire
-(about a week). Diagnostics never include them.
+Bold sign-in and the webhook's secret. Anyone who can read that folder (or a
+backup of it) could unlock your locks over Bluetooth, from within Bluetooth
+range, until the keys expire (about a week). Diagnostics never include any of
+them.
+
+To report a security problem, see [SECURITY.md](SECURITY.md).
 
 ## License
 
