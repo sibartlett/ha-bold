@@ -18,7 +18,14 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 
-from .boldsmartlock import WEBHOOK_SECRET_HEADER, BoldClient, BoldError, BoldEvent
+from .boldsmartlock import (
+    WEBHOOK_SECRET_HEADER,
+    BoldClient,
+    BoldError,
+    BoldEvent,
+    WebhookPayload,
+    json_objects,
+)
 from .const import DOMAIN, PUSHED_EVENT_TYPES
 from .coordinator import BoldConfigEntry
 
@@ -79,9 +86,7 @@ async def _async_handle_webhook(entry: BoldConfigEntry, request: Request) -> Res
         return Response(status=HTTPStatus.BAD_REQUEST)
     items = payload if isinstance(payload, list) else [payload]
     events = [
-        event
-        for item in items
-        if isinstance(item, dict) and (event := BoldEvent.from_api(item))
+        event for item in json_objects(items) if (event := BoldEvent.from_api(item))
     ]
     if entry.state is ConfigEntryState.LOADED:
         entry.runtime_data.events.async_handle_push(events)
@@ -138,9 +143,7 @@ async def _async_register_with_bold(
             ours = [
                 existing
                 for existing in await data.client.get_webhooks(organization_id)
-                if existing.get("id") == stored.get(str(organization_id))
-                or existing.get("webhookUrl") == url
-                or str(existing.get("webhookUrl", "")).endswith(path)
+                if _is_ours(existing, stored.get(str(organization_id)), url, path)
             ]
             for duplicate in ours[1:]:
                 await data.client.delete_webhook(duplicate["id"])
@@ -170,6 +173,21 @@ async def _async_register_with_bold(
     if registered:
         _LOGGER.debug("Bold pushes events to %s", url)
         data.events.async_set_push_active(active=True)
+
+
+def _is_ours(
+    webhook: WebhookPayload, stored_id: int | None, url: str, path: str
+) -> bool:
+    """Return whether a Bold webhook is this config entry's.
+
+    By the ID stored when it was created, or its URL: the same, or the same
+    path on another host, e.g. after the external URL changed.
+    """
+    webhook_url: str | None = webhook.get("webhookUrl")
+    return webhook.get("id") == stored_id or (
+        isinstance(webhook_url, str)
+        and (webhook_url == url or webhook_url.endswith(path))
+    )
 
 
 async def async_remove_push(

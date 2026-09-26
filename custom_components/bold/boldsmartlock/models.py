@@ -6,11 +6,24 @@ from enum import StrEnum
 import re
 from typing import Any
 
+from .payloads import (
+    DevicePayload,
+    DeviceTypePayload,
+    EventPayload,
+    FeaturesPayload,
+    GatewayPayload,
+    ModelPayload,
+    PersonPayload,
+    ReadingsPayload,
+    ReferencePayload,
+    SettingsPayload,
+)
+
 DEVICE_TYPE_LOCK = 1
 DEVICE_TYPE_GATEWAY = 2
 
 
-def parse_datetime(value: Any) -> datetime | None:
+def parse_datetime(value: str | None) -> datetime | None:
     """Parse an ISO 8601 timestamp from the API."""
     if not isinstance(value, str) or not value:
         return None
@@ -53,7 +66,7 @@ _ISO_DURATION_RE = re.compile(
 )
 
 
-def parse_duration(value: Any) -> timedelta | None:
+def parse_duration(value: float | str | None) -> timedelta | None:
     """Parse a duration from the API.
 
     Durations are sometimes integers (seconds), and sometimes Scala
@@ -67,7 +80,7 @@ def parse_duration(value: Any) -> timedelta | None:
         return None
 
 
-def _parse_duration(value: Any) -> timedelta | None:
+def _parse_duration(value: float | str | None) -> timedelta | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
@@ -85,20 +98,30 @@ def _parse_duration(value: Any) -> timedelta | None:
 
 
 # Bold's JSON isn't guaranteed to have the documented shape; these take a
-# value only if it has the expected type.
-def _int(value: Any) -> int | None:
+# value only if it has the expected type. They're typed by the field types
+# in payloads, so mypy catches a misspelled field: .get() returns object.
+def _int(value: int | None) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
-def _str(value: Any) -> str | None:
+def _str(value: str | None) -> str | None:
     return value if isinstance(value, str) else None
 
 
-def _dict(value: Any) -> dict[str, Any]:
+def _flag(value: bool | None) -> bool:
+    return value is True
+
+
+def _lower(value: str | None) -> str | None:
+    return value.lower() if isinstance(value, str) else None
+
+
+def _dict(value: Any) -> Any:
+    """Return an object, or an empty one; typed by the caller."""
     return value if isinstance(value, dict) else {}
 
 
-def _person_name(person: Any) -> str | None:
+def _person_name(person: PersonPayload | None) -> str | None:
     """Return the display name of a user, account or triggeredBy object."""
     if not isinstance(person, dict):
         return None
@@ -126,13 +149,13 @@ class BoldEventType(StrEnum):
     TAMPER_VIBRATION = "DeviceTamperVibration"
 
 
-def _number(value: Any) -> float | None:
+def _number(value: float | None) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value)
 
 
-def _millivolts(value: Any) -> float | None:
+def _millivolts(value: float | None) -> float | None:
     """Convert a voltage in millivolts, as Bold reports it, to volts.
 
     Zero means the lock didn't measure it.
@@ -144,6 +167,10 @@ def _millivolts(value: Any) -> float | None:
 
 # How Bold reports bolt positions: "LOCKED" on devices, "Locked" in events.
 _BOLT_STATES = {"LOCKED": True, "UNLOCKED": False}
+
+
+def _bolt_state(value: str | None) -> bool | None:
+    return _BOLT_STATES.get(value.upper()) if isinstance(value, str) else None
 
 
 @dataclass(frozen=True)
@@ -171,44 +198,39 @@ class BoldDevice:
     gateway_rssi: int | None
     gateway_rssi_level: str | None
     gateway_last_seen: datetime | None
-    raw: dict[str, Any] = field(repr=False, compare=False)
+    raw: DevicePayload = field(repr=False, compare=False)
 
     @classmethod
-    def from_api(cls, data: dict[str, Any]) -> BoldDevice | None:
+    def from_api(cls, data: DevicePayload) -> BoldDevice | None:
         """Create a device from an API response, if it has an ID."""
         if (device_id := _int(data.get("id"))) is None:
             return None
-        model = _dict(data.get("model"))
-        features = _dict(data.get("features"))
-        settings = _dict(data.get("settings"))
-        gateway = _dict(data.get("gateway"))
-        battery_level = data.get("batteryLevel")
+        model: ModelPayload = _dict(data.get("model"))
+        device_type: DeviceTypePayload = _dict(model.get("type"))
+        owner: PersonPayload = _dict(data.get("owner"))
+        features: FeaturesPayload = _dict(data.get("features"))
+        settings: SettingsPayload = _dict(data.get("settings"))
+        gateway: GatewayPayload = _dict(data.get("gateway"))
         return cls(
             id=device_id,
             name=_str(data.get("name")) or f"Bold {device_id}",
-            type_id=_int(_dict(model.get("type")).get("id")),
+            type_id=_int(device_type.get("id")),
             model_name=_str(model.get("description")) or _str(model.get("name")),
-            organization_id=_int(_dict(data.get("owner")).get("organizationId")),
+            organization_id=_int(owner.get("organizationId")),
             actual_firmware_version=_int(data.get("actualFirmwareVersion")),
             required_firmware_version=_int(data.get("requiredFirmwareVersion")),
-            battery_level=(
-                battery_level.lower() if isinstance(battery_level, str) else None
-            ),
+            battery_level=_lower(data.get("batteryLevel")),
             activation_time=parse_duration(settings.get("activationTime")),
             is_active_until=parse_datetime(data.get("isActiveUntil")),
-            reports_bolt=bool(features.get("lockedStatus"))
-            and bool(settings.get("lockedStatus")),
-            bolt_locked=_BOLT_STATES.get(str(data.get("locked")).upper()),
+            reports_bolt=_flag(features.get("lockedStatus"))
+            and _flag(settings.get("lockedStatus")),
+            bolt_locked=_bolt_state(data.get("locked")),
             bolt_changed=parse_datetime(data.get("lastLocked")),
-            remote_access=bool(features.get("remoteAccess")),
-            event_log=bool(features.get("eventLog")),
+            remote_access=_flag(features.get("remoteAccess")),
+            event_log=_flag(features.get("eventLog")),
             gateway_id=_int(gateway.get("id")),
             gateway_rssi=_int(gateway.get("rssi")),
-            gateway_rssi_level=(
-                rssi_level.lower()
-                if isinstance(rssi_level := gateway.get("rssiLevel"), str)
-                else None
-            ),
+            gateway_rssi_level=_lower(gateway.get("rssiLevel")),
             gateway_last_seen=parse_datetime(gateway.get("lastSeen")),
             raw=data,
         )
@@ -258,17 +280,17 @@ class BoldEvent:
     voltage_under_load: float | None
     # Seconds since the lock started, from status and debug events.
     uptime: float | None
-    raw: dict[str, Any] = field(repr=False, compare=False)
+    raw: EventPayload = field(repr=False, compare=False)
 
     @classmethod
-    def from_api(cls, data: dict[str, Any]) -> BoldEvent | None:
+    def from_api(cls, data: EventPayload) -> BoldEvent | None:
         """Create an event from an API response, if it is well formed."""
         time = parse_datetime(data.get("time"))
         if not _str(data.get("type")) or time is None:
             return None
-        event_id = data.get("id")
+        connect: ReferencePayload | None = data.get("connect")
         # Status events report at the top level, debug events in a body.
-        report: dict[str, Any] = {}
+        report: ReadingsPayload = {}
         if data["type"] == BoldEventType.STATUS:
             report = data
         elif data["type"] == BoldEventType.DEBUG and isinstance(
@@ -276,7 +298,7 @@ class BoldEvent:
         ):
             report = body
         return cls(
-            id=event_id if isinstance(event_id, int) else None,
+            id=_int(data.get("id")),
             type=data["type"],
             time=time,
             device_id=_int(_dict(data.get("device")).get("id")),
@@ -289,11 +311,11 @@ class BoldEvent:
             ),
             # Remote activations name the Bold Connect they went through;
             # "remoteActivation" is documented but not always sent.
-            remote_activation=bool(data.get("remoteActivation") or data.get("connect")),
+            remote_activation=_flag(data.get("remoteActivation")) or bool(connect),
             activation_time=parse_duration(data.get("activationTime")),
             keep_active_until=parse_datetime(data.get("keepActiveUntil")),
             bolt_locked=(
-                _BOLT_STATES.get(str(data.get("status")).upper())
+                _bolt_state(data.get("status"))
                 if data["type"] == BoldEventType.LOCKED
                 else None
             ),

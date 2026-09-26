@@ -23,8 +23,20 @@ from .exceptions import (
     BoldRateLimitError,
 )
 from .models import BoldDevice, BoldEvent, parse_duration
+from .payloads import (
+    AccountPayload,
+    CommandPayload,
+    CommandResponsePayload,
+    HandshakePayload,
+    WebhookPayload,
+    json_objects,
+)
 
 PAGE_SIZE = 100
+
+
+def _is_id(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 class BoldClient:
@@ -76,10 +88,10 @@ class BoldClient:
         except ClientError as err:
             raise BoldConnectionError(f"{method} {path} failed: {err}") from err
 
-    async def get_account(self) -> dict[str, Any]:
+    async def get_account(self) -> AccountPayload:
         """Return the account of the current session."""
-        account = await self._request("GET", "/v1/account")
-        if not isinstance(account, dict):
+        account: AccountPayload = await self._request("GET", "/v1/account")
+        if not isinstance(account, dict) or not _is_id(account.get("id")):
             raise BoldError("Unexpected response from GET /v1/account")
         return account
 
@@ -95,8 +107,8 @@ class BoldClient:
                 raise BoldError("Unexpected response from GET /v2/devices")
             devices.extend(
                 device
-                for item in page
-                if isinstance(item, dict) and (device := BoldDevice.from_api(item))
+                for item in json_objects(page)
+                if (device := BoldDevice.from_api(item))
             )
             if len(page) < PAGE_SIZE:
                 return devices
@@ -126,8 +138,8 @@ class BoldClient:
                 raise BoldError("Unexpected response from GET /v2/events")
             events.extend(
                 event
-                for item in page
-                if isinstance(item, dict) and (event := BoldEvent.from_api(item))
+                for item in json_objects(page)
+                if (event := BoldEvent.from_api(item))
             )
             if len(page) < PAGE_SIZE:
                 return events
@@ -135,7 +147,7 @@ class BoldClient:
 
     async def get_bluetooth_handshakes(
         self, device_ids: list[int]
-    ) -> list[dict[str, Any]]:
+    ) -> list[HandshakePayload]:
         """Return Bluetooth handshakes for devices.
 
         Not part of Bold's public API: this is what the Bold app uses to talk
@@ -148,7 +160,7 @@ class BoldClient:
 
     async def get_bluetooth_commands(
         self, device_ids: list[int], command_types: list[str]
-    ) -> list[dict[str, Any]]:
+    ) -> list[CommandPayload]:
         """Return signed Bluetooth commands, e.g. "Activate", for devices.
 
         Not part of Bold's public API: this is what the Bold app uses to talk
@@ -162,10 +174,8 @@ class BoldClient:
             },
         )
 
-    async def _get_list(
-        self, path: str, params: dict[str, Any]
-    ) -> list[dict[str, Any]]:
-        """Get a list of objects."""
+    async def _get_list(self, path: str, params: dict[str, Any]) -> list[Any]:
+        """Get a list of objects, typed by the caller."""
         response = await self._request("GET", path, params)
         if not isinstance(response, list) or not all(
             isinstance(item, dict) for item in response
@@ -173,9 +183,18 @@ class BoldClient:
             raise BoldError(f"Unexpected response from GET {path}")
         return response
 
-    async def get_webhooks(self, organization_id: int) -> list[dict[str, Any]]:
-        """Return an organization's webhooks: id, webhookUrl and types."""
-        return await self._get_list("/v3/webhooks", {"organizationId": organization_id})
+    async def get_webhooks(self, organization_id: int) -> list[WebhookPayload]:
+        """Return an organization's webhooks: id, webhookUrl and types.
+
+        Webhooks without an ID can't be updated or deleted, so are left out.
+        """
+        return [
+            webhook
+            for webhook in await self._get_list(
+                "/v3/webhooks", {"organizationId": organization_id}
+            )
+            if _is_id(webhook.get("id"))
+        ]
 
     async def create_webhook(
         self,
@@ -227,9 +246,11 @@ class BoldClient:
         """End an activation of a device."""
         await self._command(device_id, "remote-deactivation")
 
-    async def _command(self, device_id: int, command: str) -> dict[str, Any]:
+    async def _command(self, device_id: int, command: str) -> CommandResponsePayload:
         """Send a remote command and check its result."""
-        response = await self._request("POST", f"/v1/devices/{device_id}/{command}")
+        response: CommandResponsePayload = await self._request(
+            "POST", f"/v1/devices/{device_id}/{command}"
+        )
         if not isinstance(response, dict):
             raise BoldError(f"Unexpected response from {command}")
         code = response.get("errorCode")

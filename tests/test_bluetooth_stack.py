@@ -448,7 +448,12 @@ def test_parse_malformed_keys() -> None:
         "expiration": "2099-01-01T00:00:00Z",
     }
     keys = parse_keys(
-        ["junk", {**handshake, "deviceId": True}, {**handshake, "deviceId": 1}],
+        [
+            "junk",
+            {**handshake, "deviceId": True},
+            {**handshake, "deviceId": 2, "payload": "\x80"},
+            {**handshake, "deviceId": 1},
+        ],
         ["junk", {"deviceId": True, "commandType": "Activate", "payload": "aGk="}],
     )
     assert list(keys) == [1]

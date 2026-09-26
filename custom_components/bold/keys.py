@@ -6,7 +6,6 @@ over Bluetooth while Bold's cloud is unreachable.
 """
 
 import base64
-import binascii
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,6 +21,9 @@ from .boldsmartlock import (
     COMMAND_DEACTIVATE,
     BoldClient,
     BoldError,
+    CommandPayload,
+    HandshakePayload,
+    json_objects,
     parse_datetime,
 )
 from .const import DOMAIN
@@ -63,40 +65,43 @@ class BoldLockKeys:
         return command.value
 
 
-def _secret(value: Any, expires: Any) -> BoldSecret | None:
+def _secret(value: str | None, expires: str | None) -> BoldSecret | None:
     """Decode a base64 secret and its expiry."""
     if not isinstance(value, str) or (expiry := parse_datetime(expires)) is None:
         return None
     try:
         return BoldSecret(base64.b64decode(value, validate=True), expiry)
-    except binascii.Error:
+    except ValueError:
+        # Not base64 (binascii.Error), or not even ASCII.
         return None
 
 
-def _device_id(value: Any) -> int | None:
+def _device_id(value: int | None) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
-def parse_keys(handshakes: list[Any], commands: list[Any]) -> dict[int, BoldLockKeys]:
+def parse_keys(
+    handshakes: list[HandshakePayload], commands: list[CommandPayload]
+) -> dict[int, BoldLockKeys]:
     """Return the keys of each lock, from Bold's handshakes and commands.
 
     Anything malformed is skipped: a command, or a lock without a valid
     handshake.
     """
     lock_commands: dict[int, dict[str, BoldSecret]] = {}
-    for command in commands:
+    command: CommandPayload
+    for command in json_objects(commands):
+        command_type: str | None = command.get("commandType")
         if (
-            isinstance(command, dict)
-            and (device_id := _device_id(command.get("deviceId"))) is not None
-            and isinstance(command_type := command.get("commandType"), str)
+            (device_id := _device_id(command.get("deviceId"))) is not None
+            and isinstance(command_type, str)
             and (secret := _secret(command.get("payload"), command.get("expiration")))
         ):
             lock_commands.setdefault(device_id, {})[command_type] = secret
 
     keys: dict[int, BoldLockKeys] = {}
-    for handshake in handshakes:
-        if not isinstance(handshake, dict):
-            continue
+    handshake: HandshakePayload
+    for handshake in json_objects(handshakes):
         device_id = _device_id(handshake.get("deviceId"))
         key = _secret(handshake.get("handshakeKey"), handshake.get("expiration"))
         payload = _secret(handshake.get("payload"), handshake.get("expiration"))

@@ -101,9 +101,13 @@ class OAuth2FlowHandler(
             )
 
         self._abort_if_unique_id_configured()
+        first_name: str | None = account.get("firstName")
+        last_name: str | None = account.get("lastName")
+        email: str | None = account.get("email")
         name = " ".join(
-            part for part in (account.get("firstName"), account.get("lastName")) if part
+            part for part in (first_name, last_name) if isinstance(part, str) and part
         )
         return self.async_create_entry(
-            title=name or account.get("email") or "Bold", data=data
+            title=name or (email if isinstance(email, str) else "") or "Bold",
+            data=data,
         )
