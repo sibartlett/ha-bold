@@ -629,7 +629,7 @@
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
-    'state': 'unavailable',
+    'state': '-70',
   })
 # ---
 # name: test_entities[sensor][sensor.front_door_bold_connect_signal-entry]

@@ -325,6 +325,8 @@ class FakeBluetooth:
     def __init__(self) -> None:
         """Start with the test lock in range, and every command succeeding."""
         self.reachable: set[int] = {LOCK_ID}
+        # How well Home Assistant hears the lock: well enough to prefer it.
+        self.rssi = -70
         self.ble_device = object()
         self.sent: list[bytes] = []
         self.timeouts: list[float] = []
@@ -376,6 +378,9 @@ def fake_bluetooth(
     def start(self: BoldBluetoothTracker, entry: object) -> None:
         for device_id in fake.reachable:
             self._reachable.add(device_id)
+            self._rssi[device_id] = fake.rssi
+            # As the real tracker does when it first hears a lock.
+            self._async_notify(device_id)
 
     with (
         patch.object(BoldBluetoothTracker, "async_start", start),
