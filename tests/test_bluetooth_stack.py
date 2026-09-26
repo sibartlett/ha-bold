@@ -1,6 +1,6 @@
 """Tests for the parts of Bluetooth support that touch the radio and storage."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 import sys
 from types import SimpleNamespace
 from typing import Any
@@ -32,7 +32,7 @@ from custom_components.bold.boldsmartlock.ble import (
     encode_packet,
 )
 from custom_components.bold.boldsmartlock.const import API_URL
-from custom_components.bold.keys import BoldBluetoothKeys
+from custom_components.bold.keys import BoldBluetoothKeys, decode_keys, parse_keys
 from custom_components.bold.tracker import BoldBluetoothTracker
 
 from .conftest import HANDSHAKE_KEY as CLOUD_HANDSHAKE_KEY, LOCK_ID, mock_bluetooth_keys
@@ -417,3 +417,39 @@ async def test_keys_ignore_invalid(
     assert keys.get(3).commands == {}
     assert keys.command(3, "Activate") is None
     await keys.async_refresh([])
+
+
+def test_decode_damaged_keys() -> None:
+    """Test damaged stored keys are skipped, and times without a zone are UTC."""
+    secret = {"value": "aGk=", "expires": "2099-01-01T00:00:00"}
+    lock = {"handshake_key": secret, "handshake_payload": secret, "commands": {}}
+    keys = decode_keys(
+        {
+            "locks": {
+                "1": {**lock, "commands": {"Activate": secret}},
+                # A damaged command, and a lock ID that isn't one.
+                "2": {**lock, "commands": {"Activate": "broken"}},
+                "lock": lock,
+            }
+        }
+    )
+    assert list(keys) == [1]
+    assert keys[1].commands["Activate"].expires == datetime(2099, 1, 1, tzinfo=UTC)
+    assert keys[1].command("Activate", dt_util.utcnow()) == b"hi"
+    assert decode_keys({"locks": []}) == {}
+    assert decode_keys(None) == {}
+
+
+def test_parse_malformed_keys() -> None:
+    """Test entries that aren't objects, or with a true/false device ID, are skipped."""
+    handshake = {
+        "handshakeKey": "aGk=",
+        "payload": "aGk=",
+        "expiration": "2099-01-01T00:00:00Z",
+    }
+    keys = parse_keys(
+        ["junk", {**handshake, "deviceId": True}, {**handshake, "deviceId": 1}],
+        ["junk", {"deviceId": True, "commandType": "Activate", "payload": "aGk="}],
+    )
+    assert list(keys) == [1]
+    assert keys[1].commands == {}

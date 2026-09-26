@@ -73,8 +73,38 @@ def _secret(value: Any, expires: Any) -> BoldSecret | None:
         return None
 
 
-def _storage_key(entry_id: str) -> str:
-    return f"{DOMAIN}.{entry_id}.bluetooth_keys"
+def _device_id(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def parse_keys(handshakes: list[Any], commands: list[Any]) -> dict[int, BoldLockKeys]:
+    """Return the keys of each lock, from Bold's handshakes and commands.
+
+    Anything malformed is skipped: a command, or a lock without a valid
+    handshake.
+    """
+    lock_commands: dict[int, dict[str, BoldSecret]] = {}
+    for command in commands:
+        if (
+            isinstance(command, dict)
+            and (device_id := _device_id(command.get("deviceId"))) is not None
+            and isinstance(command_type := command.get("commandType"), str)
+            and (secret := _secret(command.get("payload"), command.get("expiration")))
+        ):
+            lock_commands.setdefault(device_id, {})[command_type] = secret
+
+    keys: dict[int, BoldLockKeys] = {}
+    for handshake in handshakes:
+        if not isinstance(handshake, dict):
+            continue
+        device_id = _device_id(handshake.get("deviceId"))
+        key = _secret(handshake.get("handshakeKey"), handshake.get("expiration"))
+        payload = _secret(handshake.get("payload"), handshake.get("expiration"))
+        if device_id is not None and key and payload:
+            keys[device_id] = BoldLockKeys(
+                key, payload, lock_commands.get(device_id, {})
+            )
+    return keys
 
 
 def _encode(secret: BoldSecret) -> dict[str, str]:
@@ -82,6 +112,62 @@ def _encode(secret: BoldSecret) -> dict[str, str]:
         "value": base64.b64encode(secret.value).decode(),
         "expires": secret.expires.isoformat(),
     }
+
+
+def encode_keys(keys: dict[int, BoldLockKeys]) -> dict[str, Any]:
+    """Return keys in the form they're stored."""
+    return {
+        "locks": {
+            str(device_id): {
+                "handshake_key": _encode(lock.handshake_key),
+                "handshake_payload": _encode(lock.handshake_payload),
+                "commands": {
+                    command_type: _encode(command)
+                    for command_type, command in lock.commands.items()
+                },
+            }
+            for device_id, lock in keys.items()
+        }
+    }
+
+
+def _decode(data: Any) -> BoldSecret | None:
+    return (
+        _secret(data.get("value"), data.get("expires"))
+        if isinstance(data, dict)
+        else None
+    )
+
+
+def decode_keys(stored: Any) -> dict[int, BoldLockKeys]:
+    """Return stored keys, skipping any lock whose keys are damaged."""
+    locks = stored.get("locks") if isinstance(stored, dict) else None
+    keys: dict[int, BoldLockKeys] = {}
+    for device_id, lock in (locks if isinstance(locks, dict) else {}).items():
+        if not (
+            isinstance(device_id, str)
+            and device_id.isdigit()
+            and isinstance(lock, dict)
+            and (handshake_key := _decode(lock.get("handshake_key")))
+            and (handshake_payload := _decode(lock.get("handshake_payload")))
+            and isinstance(stored_commands := lock.get("commands"), dict)
+        ):
+            _LOGGER.debug("Ignoring invalid stored keys for %s", device_id)
+            continue
+        commands = {
+            command_type: command
+            for command_type, data in stored_commands.items()
+            if (command := _decode(data))
+        }
+        if len(commands) != len(stored_commands):
+            _LOGGER.debug("Ignoring invalid stored keys for %s", device_id)
+            continue
+        keys[int(device_id)] = BoldLockKeys(handshake_key, handshake_payload, commands)
+    return keys
+
+
+def _storage_key(entry_id: str) -> str:
+    return f"{DOMAIN}.{entry_id}.bluetooth_keys"
 
 
 class BoldBluetoothKeys:
@@ -117,28 +203,7 @@ class BoldBluetoothKeys:
 
     async def async_load(self) -> None:
         """Load stored keys."""
-        stored = await self._store.async_load() or {}
-        for device_id, keys in stored.get("locks", {}).items():
-            try:
-                self._keys[int(device_id)] = BoldLockKeys(
-                    handshake_key=BoldSecret(
-                        base64.b64decode(keys["handshake_key"]["value"]),
-                        datetime.fromisoformat(keys["handshake_key"]["expires"]),
-                    ),
-                    handshake_payload=BoldSecret(
-                        base64.b64decode(keys["handshake_payload"]["value"]),
-                        datetime.fromisoformat(keys["handshake_payload"]["expires"]),
-                    ),
-                    commands={
-                        command_type: BoldSecret(
-                            base64.b64decode(command["value"]),
-                            datetime.fromisoformat(command["expires"]),
-                        )
-                        for command_type, command in keys["commands"].items()
-                    },
-                )
-            except KeyError, TypeError, ValueError, binascii.Error:
-                _LOGGER.debug("Ignoring invalid stored keys for %s", device_id)
+        self._keys.update(decode_keys(await self._store.async_load()))
 
     async def async_refresh(self, device_ids: list[int]) -> None:
         """Fetch fresh keys for locks from Bold's cloud, keeping old ones on errors."""
@@ -160,41 +225,8 @@ class BoldBluetoothKeys:
             _LOGGER.info("Refreshed the Bluetooth keys of Bold locks again")
         self._failing = False
 
-        lock_commands: dict[int, dict[str, BoldSecret]] = {}
-        for command in commands:
-            if (
-                isinstance(device_id := command.get("deviceId"), int)
-                and isinstance(command_type := command.get("commandType"), str)
-                and (
-                    secret := _secret(command.get("payload"), command.get("expiration"))
-                )
-            ):
-                lock_commands.setdefault(device_id, {})[command_type] = secret
-
-        for handshake in handshakes:
-            device_id = handshake.get("deviceId")
-            key = _secret(handshake.get("handshakeKey"), handshake.get("expiration"))
-            payload = _secret(handshake.get("payload"), handshake.get("expiration"))
-            if isinstance(device_id, int) and key and payload:
-                self._keys[device_id] = BoldLockKeys(
-                    key, payload, lock_commands.get(device_id, {})
-                )
-
-        await self._store.async_save(
-            {
-                "locks": {
-                    str(device_id): {
-                        "handshake_key": _encode(keys.handshake_key),
-                        "handshake_payload": _encode(keys.handshake_payload),
-                        "commands": {
-                            command_type: _encode(command)
-                            for command_type, command in keys.commands.items()
-                        },
-                    }
-                    for device_id, keys in self._keys.items()
-                }
-            }
-        )
+        self._keys.update(parse_keys(handshakes, commands))
+        await self._store.async_save(encode_keys(self._keys))
         for listener in list(self._listeners):
             listener()
 
