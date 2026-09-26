@@ -431,17 +431,21 @@ async def test_get_events_paginates(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Test all pages of events are fetched."""
-    first_page = [
-        event_payload(i, "DeviceBoot", "2026-09-24T12:00:00Z") for i in range(PAGE_SIZE)
-    ]
-    aioclient_mock.get(f"{API_URL}/v2/events", params={"offset": 0}, json=first_page)
-    aioclient_mock.get(
-        f"{API_URL}/v2/events",
-        params={"offset": PAGE_SIZE},
-        json=[event_payload(PAGE_SIZE, "DeviceBoot", "2026-09-24T12:00:00Z")],
-    )
+
+    def page(start: int, size: int) -> list[dict]:
+        return [
+            event_payload(i, "DeviceBoot", "2026-09-24T12:00:00Z")
+            for i in range(start, start + size)
+        ]
+
+    for number, events in enumerate(
+        (page(0, PAGE_SIZE), page(PAGE_SIZE, PAGE_SIZE), page(2 * PAGE_SIZE, 1))
+    ):
+        aioclient_mock.get(
+            f"{API_URL}/v2/events", params={"offset": number * PAGE_SIZE}, json=events
+        )
     events = await _client(hass).get_events([1], datetime.now(UTC))
-    assert len(events) == PAGE_SIZE + 1
+    assert len(events) == 2 * PAGE_SIZE + 1
 
 
 async def test_get_bluetooth_keys(

@@ -26,10 +26,18 @@ from .conftest import GATEWAY, LOCK
 
 
 async def test_setup_and_unload(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
 ) -> None:
     """Test the integration sets up and unloads."""
     assert init_integration.state is ConfigEntryState.LOADED
+    # Bold is called with the account's token.
+    assert mock_api.mock_calls
+    assert all(
+        call[3] == {"Authorization": "Bearer access-token"}
+        for call in mock_api.mock_calls
+    )
     assert init_integration.runtime_data.events is not None
     assert init_integration.runtime_data.events.device_ids == [LOCK["id"]]
 

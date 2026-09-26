@@ -190,7 +190,7 @@ def test_cryptor_known_answer() -> None:
     directly: that's what the real lock does.
     """
     key, nonce = bytes(range(16)), bytes(range(13))
-    first, second = bytes(40), bytes(20)
+    first, second, third = bytes(33), bytes(20), bytes(5)
 
     def aes_ctr(counter: int, data: bytes) -> bytes:
         iv = nonce + bytes([0, 0, counter])
@@ -199,8 +199,10 @@ def test_cryptor_known_answer() -> None:
 
     cryptor = BoldCryptor(key, nonce)
     assert cryptor.process(first) == aes_ctr(0, first)
-    # 40 bytes used three 16-byte blocks, so the next message starts at 3.
+    # 33 bytes used three 16-byte blocks, so the next message starts at 3,
+    # and the one after that at 5.
     assert cryptor.process(second) == aes_ctr(3, second)
+    assert cryptor.process(third) == aes_ctr(5, third)
 
 
 def test_cryptor_is_symmetric() -> None:
@@ -221,7 +223,15 @@ def test_parse_advertisement() -> None:
     assert advertisement.device_id == 1
     assert advertisement.events_available
     assert not advertisement.installable
+    assert not advertisement.should_time_sync
+    assert not advertisement.in_dfu_mode
     assert parse_advertisement(b"\x02\x01") is None
+    # Only the lowest bit.
+    advertisement = parse_advertisement(bytes.fromhex("020103010000000000000001"))
+    assert advertisement is not None
+    assert advertisement.installable
+    assert not advertisement.should_time_sync
+    assert not advertisement.in_dfu_mode
     # The other flags, each a bit of the last byte.
     advertisement = parse_advertisement(bytes.fromhex("02010301000000000000000d"))
     assert advertisement is not None

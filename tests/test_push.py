@@ -311,17 +311,33 @@ async def test_cloudhook(
             "https://hooks.nabu.casa/hook"
         )
 
-        # After a restart, the stored cloudhook is reused.
+        # After a restart, the stored cloudhook is reused, and Bold's webhook
+        # is recognised by it, even without its stored ID.
+        hass.config_entries.async_update_entry(
+            mock_config_entry,
+            data={**mock_config_entry.data, CONF_BOLD_WEBHOOKS: {}},
+        )
+        aioclient_mock._mocks = [  # noqa: SLF001
+            mock
+            for mock in aioclient_mock._mocks  # noqa: SLF001
+            if not (mock.method == "get" and str(mock.url) == WEBHOOKS)
+        ]
+        aioclient_mock.get(
+            WEBHOOKS, json=[{"id": 99, "webhookUrl": "https://hooks.nabu.casa/hook"}]
+        )
         await hass.config_entries.async_reload(mock_config_entry.entry_id)
         await hass.async_block_till_done()
         cloud.async_create_cloudhook.assert_awaited_once()
-        create = _calls(aioclient_mock, "POST", WEBHOOKS)[-1]
-        assert create[2]["webhookUrl"] == "https://hooks.nabu.casa/hook"
+        assert len(_calls(aioclient_mock, "POST", WEBHOOKS)) == 1
+        (update,) = _calls(aioclient_mock, "PUT", f"{WEBHOOKS}/99")
+        assert update[2]["webhookUrl"] == "https://hooks.nabu.casa/hook"
 
         # Removing the integration removes the cloudhook and the webhook.
         await hass.config_entries.async_remove(mock_config_entry.entry_id)
         await hass.async_block_till_done()
-    cloud.async_delete_cloudhook.assert_awaited_once()
+    cloud.async_delete_cloudhook.assert_awaited_once_with(
+        hass, mock_config_entry.data[CONF_WEBHOOK_ID]
+    )
     assert len(_calls(aioclient_mock, "DELETE", f"{WEBHOOKS}/99")) == 1
 
 

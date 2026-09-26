@@ -396,6 +396,13 @@ async def test_keys_ignore_invalid(
                 "handshakeKey": "aGk=",
                 "payload": "aGk=",
             },
+            # A handshake, but no commands.
+            {
+                "deviceId": 3,
+                "expiration": "2099-01-01T00:00:00Z",
+                "handshakeKey": "aGk=",
+                "payload": "aGk=",
+            },
         ],
     )
     aioclient_mock.get(f"{API_URL}/v2/controller/commands", json=[])
@@ -404,7 +411,9 @@ async def test_keys_ignore_invalid(
     )
     await keys.async_load()
     assert keys.get(1) is None
-    await keys.async_refresh([1, 2])
+    await keys.async_refresh([1, 2, 3])
     assert keys.get(1) is None
     assert keys.get(2) is None
+    assert keys.get(3).commands == {}
+    assert keys.command(3, "Activate") is None
     await keys.async_refresh([])

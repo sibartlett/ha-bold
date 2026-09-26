@@ -261,6 +261,28 @@ async def test_activation_event_lasts_its_activation_time(
     assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
 
+async def test_older_deactivation_after_unlock(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test a deactivation from before an unlock doesn't end it."""
+    aioclient_mock.post(
+        f"{API_URL}/v1/devices/{LOCK_ID}/remote-activation",
+        json={"deviceId": LOCK_ID, "errorCode": "OK", "activationTime": 60},
+    )
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
+    await call_lock(hass, SERVICE_UNLOCK)
+    set_events(
+        aioclient_mock,
+        [event_payload(99, "DeviceDeactivation", "2026-09-24T11:59:50+00:00")],
+    )
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
 async def test_failed_activation_event_stays_locked(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
