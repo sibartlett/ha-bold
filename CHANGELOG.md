@@ -49,12 +49,6 @@ scratch.
 
 ### Switching from the older Bold integration
 
-This integration uses the same `bold` domain as the older one
-([lwestenberg/homeassistant_bold](https://github.com/lwestenberg/homeassistant_bold)),
-so the two can't be installed together:
-
-1. Delete the old integration under **Settings → Devices & services → Bold**.
-2. Remove it in HACS, and restart Home Assistant.
-3. Install this one as described in the [README](README.md#installation), and
-   add it again. Entity IDs may differ, so check automations and dashboards
-   that used the old entities.
+This integration uses the same `bold` domain as the older one, so the two
+can't be installed together: remove the old one first, as described in the
+[README](README.md#switching-from-the-older-bold-integration).

@@ -58,6 +58,19 @@ If Home Assistant can hear a Bold lock over Bluetooth, or sees a Bold Connect
 join your network, it offers to set up Bold under
 **Settings → Devices & services → Discovered**.
 
+### Switching from the older Bold integration
+
+This integration replaces the older one
+([lwestenberg/homeassistant_bold](https://github.com/lwestenberg/homeassistant_bold)),
+and uses the same `bold` domain, so the two can't be installed together:
+
+1. Delete the old integration under **Settings → Devices & services → Bold**.
+2. Remove it in HACS, and restart Home Assistant.
+3. Install this one as above, and add it again.
+
+Entity IDs may differ, so check automations and dashboards that used the old
+ones.
+
 ## Entities
 
 A Bold lock is not motorised: unlocking it _activates_ the cylinder, so it can
