@@ -1,6 +1,7 @@
 """Tests for the Bold API client."""
 
 from datetime import UTC, datetime, timedelta
+import time
 from unittest.mock import Mock
 
 from aiohttp import ClientConnectionError, ClientResponseError
@@ -28,6 +29,13 @@ from custom_components.bold.boldsmartlock.client import PAGE_SIZE
 from custom_components.bold.boldsmartlock.const import API_URL
 
 from .conftest import GATEWAY_ID, LOCK, LOCK_ID, event_payload
+
+
+def test_parse_duration_is_fast() -> None:
+    """Test a long run of spaces doesn't make parsing slow (it was quadratic)."""
+    start = time.perf_counter()
+    assert parse_duration("9" + " " * 50_000 + "!") is None
+    assert time.perf_counter() - start < 0.5
 
 
 @pytest.mark.parametrize(

@@ -60,7 +60,9 @@ _DURATION_UNITS = {
     "day": 86400,
     "days": 86400,
 }
-_DURATION_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]*)\s*$")
+# Matched against a stripped value: surrounding \s* made it quadratic on
+# long runs of spaces.
+_DURATION_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*([a-zA-Z]*)$")
 _ISO_DURATION_RE = re.compile(
     r"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$"
 )
@@ -90,7 +92,7 @@ def _parse_duration(value: float | str | None) -> timedelta | None:
     if match := _ISO_DURATION_RE.match(value.strip().upper()):
         days, hours, minutes, seconds = (float(g) if g else 0 for g in match.groups())
         return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
-    if (match := _DURATION_RE.match(value)) and (
+    if (match := _DURATION_RE.match(value.strip())) and (
         unit := _DURATION_UNITS.get(match.group(2).lower())
     ) is not None:
         return timedelta(seconds=float(match.group(1)) * unit)
