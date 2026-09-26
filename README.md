@@ -13,7 +13,7 @@ firmware.
 
 | Device | Support |
 |---|---|
-| Bold Smart Cylinder | ✅ Tested with the Bold Classic (SX33), with and without the Classic Upgrade, which lets it report whether it's locked. Other cylinder models should work the same way. |
+| Bold Smart Cylinder | ✅ Tested with the Bold Classic, with and without the Classic Upgrade (which lets it report whether it's locked). The Bold Elite should be supported, but has not been tested. |
 | Bold Connect | ✅ Unlocks locks from anywhere, through Bold's cloud. |
 | Bold Clicker (key fob) | ➖ Ignored. Its activity shows up on the lock it opens. |
 
@@ -66,8 +66,8 @@ Each lock gets:
 
 | Entity | What it does |
 |---|---|
-| `lock.<lock>` | **Unlock** activates the lock. Locks that report their bolt position (upgraded locks, with locked status turned on in the Bold app) show it: locked or unlocked, and unlocking while activated and waiting to be turned. Other locks show as unlocked while activated and locked otherwise, as an assumed state. **Lock** ends an activation early. `changed_by` shows who last activated or deactivated it. |
-| `event.<lock>_activity` | Fires for activations (with the user and method: PIN, button, app…), failed activations such as a wrong PIN, deactivations, tamper alerts, and, for locks that report their bolt position, the bolt being locked or unlocked. |
+| `lock.<lock>` | **Unlock** activates the lock. Locks that report their bolt position show it: locked or unlocked, and unlocking while activated and waiting to be turned. Other locks show as unlocked while activated and locked otherwise, as an assumed state. **Lock** ends an activation early. `changed_by` shows who last activated or deactivated it. |
+| `event.<lock>_activity` | Fires for activations (with how: PIN, button or Bluetooth, which covers the app, Home Assistant and a Bold Connect; and who, when Bold knows), failed activations such as a wrong PIN, deactivations, tamper alerts (including repeated wrong PINs), and, for locks that report their bolt position, the bolt being locked or unlocked. |
 | `sensor.<lock>_battery_level` | Battery level as Bold reports it: Excellent, High, Medium, Low or Critical. |
 | `binary_sensor.<lock>_battery` | Low battery: on when the level is Low or Critical. |
 | `sensor.<lock>_battery_voltage` | Battery voltage at rest, from the lock's daily status report (and occasional extra readings). |
@@ -89,8 +89,7 @@ Each Bold Connect is a device too, and the locks it serves are linked to it:
 Locks and Bold Connects added to your Bold account appear automatically, and
 ones removed from it are removed from Home Assistant.
 
-To see whether a lock is locked, it needs the Classic Upgrade (or a model that
-reports its bolt), with **locked status** turned on in the Bold app. Then set
+To see whether a lock is locked, a Bold Elite or an upgraded Bold Classic is required, with **locked status** turned on in the Bold app. Then set
 or turn the lock once: until then Bold doesn't know its position. Home
 Assistant switches over within seconds.
 
@@ -211,15 +210,8 @@ actions:
   appears within seconds when Bold can push it, and within about 30 seconds
   otherwise. A Bold Connect going offline is noticed
   after 30–40 minutes.
-- **Bluetooth uses an undocumented part of Bold's API**, the one the Bold app
-  uses. Bold could change it without notice; the Bold Connect keeps working
-  either way.
 - **Locks without a Bold Connect** only report activity to Bold (and so to
   Home Assistant) when a phone with the Bold app passes by.
-- **Keep-active mode isn't supported.** It's a Bold Pro feature. Keep-active
-  periods started from the Bold app are shown on the lock.
-- **Firmware.** Bold only reports the firmware version it _requires_, which may
-  not be the newest release. Firmware is updated from the Bold app.
 - **Battery levels** are the five levels Bold reports, not percentages.
 
 ## Troubleshooting
@@ -278,8 +270,8 @@ disable it to download the log). Personal details are removed from diagnostics.
 
 The Bold API client and Bluetooth protocol live in
 `custom_components/bold/boldsmartlock/`, which doesn't depend on Home Assistant,
-so it can become a standalone library (as Home Assistant core requires). A test
-keeps it that way.
+so in the future it can become a standalone library (as Home Assistant core
+requires). A test keeps it that way.
 
 ```sh
 pip install -r requirements_test.txt pre-commit
