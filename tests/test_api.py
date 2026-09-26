@@ -46,6 +46,10 @@ from .conftest import GATEWAY_ID, LOCK, LOCK_ID, event_payload
         ("5 fortnights", None),
         (None, None),
         (True, None),
+        # Too long for a timedelta, or not a number.
+        (1e20, None),
+        ("9999999999 days", None),
+        (float("nan"), None),
     ],
 )
 def test_parse_duration(value, expected) -> None:
@@ -87,6 +91,26 @@ def test_device_from_api_minimal() -> None:
     assert device.battery_level is None
     assert not device.remote_access
     assert device.gateway_id is None
+
+
+def test_device_from_api_malformed() -> None:
+    """Test devices without an ID are skipped, and badly typed fields ignored."""
+    assert BoldDevice.from_api({}) is None
+    assert BoldDevice.from_api({"id": "9"}) is None
+    device = BoldDevice.from_api(
+        {
+            "id": 9,
+            "name": 5,
+            "model": [],
+            "gateway": "Bold Connect",
+            "actualFirmwareVersion": "89",
+            "requiredFirmwareVersion": 90,
+        }
+    )
+    assert device.name == "Bold 9"
+    assert device.model_name is None
+    assert device.gateway_id is None
+    assert not device.update_available
 
 
 def test_event_from_api() -> None:
@@ -145,6 +169,20 @@ def test_event_from_api_malformed() -> None:
     """Test malformed events are skipped."""
     assert BoldEvent.from_api({"id": 1, "type": "DeviceActivation"}) is None
     assert BoldEvent.from_api({"id": 1, "time": "2026-09-24T12:00:00Z"}) is None
+    assert BoldEvent.from_api({"type": 5, "time": "2026-09-24T12:00:00Z"}) is None
+    # Badly typed fields are ignored.
+    event = BoldEvent.from_api(
+        {
+            "type": "DeviceActivation",
+            "time": "2026-09-24T12:00:00Z",
+            "device": "Front Door",
+            "result": 1,
+            "user": {"firstName": 7, "lastName": "Lovelace", "emailAddress": []},
+        }
+    )
+    assert event.device_id is None
+    assert event.result is None
+    assert event.user_name == "Lovelace"
 
 
 def test_event_from_api_without_id() -> None:
@@ -175,6 +213,14 @@ async def test_get_devices_paginates(
     devices = await _client(hass).get_devices()
     assert len(devices) == PAGE_SIZE + 1
     assert aioclient_mock.mock_calls[0][3] == {"Authorization": "Bearer token"}
+
+
+async def test_get_devices_skips_malformed(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a malformed device doesn't stop the others being returned."""
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=[{"name": "No ID"}, "junk", LOCK])
+    assert [device.id for device in await _client(hass).get_devices()] == [LOCK_ID]
 
 
 async def test_get_events_filters(

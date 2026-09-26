@@ -60,6 +60,14 @@ def parse_duration(value: Any) -> timedelta | None:
     FiniteDuration strings, whose exact format is undocumented; accept the
     common spellings ("5 seconds", "5s", "PT5S").
     """
+    try:
+        return _parse_duration(value)
+    except OverflowError, ValueError:
+        # Too long for a timedelta, or not a number (NaN).
+        return None
+
+
+def _parse_duration(value: Any) -> timedelta | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
@@ -76,14 +84,30 @@ def parse_duration(value: Any) -> timedelta | None:
     return None
 
 
+# Bold's JSON isn't guaranteed to have the documented shape; these take a
+# value only if it has the expected type.
+def _int(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _str(value: Any) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _person_name(person: Any) -> str | None:
     """Return the display name of a user, account or triggeredBy object."""
     if not isinstance(person, dict):
         return None
     name = " ".join(
-        part for part in (person.get("firstName"), person.get("lastName")) if part
+        part
+        for part in (person.get("firstName"), person.get("lastName"))
+        if isinstance(part, str) and part
     )
-    return name or person.get("emailAddress") or None
+    return name or _str(person.get("emailAddress")) or None
 
 
 class BoldEventType(StrEnum):
@@ -151,21 +175,23 @@ class BoldDevice:
     raw: dict[str, Any] = field(repr=False, compare=False)
 
     @classmethod
-    def from_api(cls, data: dict[str, Any]) -> BoldDevice:
-        """Create a device from an API response."""
-        model = data.get("model") or {}
-        features = data.get("features") or {}
-        settings = data.get("settings") or {}
-        gateway = data.get("gateway") or {}
+    def from_api(cls, data: dict[str, Any]) -> BoldDevice | None:
+        """Create a device from an API response, if it has an ID."""
+        if (device_id := _int(data.get("id"))) is None:
+            return None
+        model = _dict(data.get("model"))
+        features = _dict(data.get("features"))
+        settings = _dict(data.get("settings"))
+        gateway = _dict(data.get("gateway"))
         battery_level = data.get("batteryLevel")
         return cls(
-            id=data["id"],
-            name=data.get("name") or f"Bold {data['id']}",
-            type_id=(model.get("type") or {}).get("id"),
-            model_name=model.get("description") or model.get("name"),
-            organization_id=(data.get("owner") or {}).get("organizationId"),
-            actual_firmware_version=data.get("actualFirmwareVersion"),
-            required_firmware_version=data.get("requiredFirmwareVersion"),
+            id=device_id,
+            name=_str(data.get("name")) or f"Bold {device_id}",
+            type_id=_int(_dict(model.get("type")).get("id")),
+            model_name=_str(model.get("description")) or _str(model.get("name")),
+            organization_id=_int(_dict(data.get("owner")).get("organizationId")),
+            actual_firmware_version=_int(data.get("actualFirmwareVersion")),
+            required_firmware_version=_int(data.get("requiredFirmwareVersion")),
             battery_level=(
                 battery_level.lower() if isinstance(battery_level, str) else None
             ),
@@ -178,8 +204,8 @@ class BoldDevice:
             bolt_changed=parse_datetime(data.get("lastLocked")),
             remote_access=bool(features.get("remoteAccess")),
             event_log=bool(features.get("eventLog")),
-            gateway_id=gateway.get("id"),
-            gateway_rssi=gateway.get("rssi"),
+            gateway_id=_int(gateway.get("id")),
+            gateway_rssi=_int(gateway.get("rssi")),
             gateway_rssi_level=(
                 rssi_level.lower()
                 if isinstance(rssi_level := gateway.get("rssiLevel"), str)
@@ -240,7 +266,7 @@ class BoldEvent:
     def from_api(cls, data: dict[str, Any]) -> BoldEvent | None:
         """Create an event from an API response, if it is well formed."""
         time = parse_datetime(data.get("time"))
-        if not data.get("type") or time is None:
+        if not _str(data.get("type")) or time is None:
             return None
         event_id = data.get("id")
         # Status events report at the top level, debug events in a body.
@@ -255,9 +281,9 @@ class BoldEvent:
             id=event_id if isinstance(event_id, int) else None,
             type=data["type"],
             time=time,
-            device_id=(data.get("device") or {}).get("id"),
-            result=data.get("result"),
-            method=data.get("method"),
+            device_id=_int(_dict(data.get("device")).get("id")),
+            result=_str(data.get("result")),
+            method=_str(data.get("method")),
             user_name=(
                 _person_name(data.get("user"))
                 or _person_name(data.get("account"))

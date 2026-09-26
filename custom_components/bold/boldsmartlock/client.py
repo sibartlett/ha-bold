@@ -93,7 +93,11 @@ class BoldClient:
             )
             if not isinstance(page, list):
                 raise BoldError("Unexpected response from GET /v2/devices")
-            devices.extend(BoldDevice.from_api(item) for item in page)
+            devices.extend(
+                device
+                for item in page
+                if isinstance(item, dict) and (device := BoldDevice.from_api(item))
+            )
             if len(page) < PAGE_SIZE:
                 return devices
             offset += PAGE_SIZE
