@@ -1,0 +1,49 @@
+name: Bug report
+description: Something doesn't work as the README describes.
+labels: [bug]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: integration-version
+    attributes:
+      label: Integration version
+      description: In HACS, or Settings → Devices & services → Bold Smart Lock.
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      description: Settings → About.
+    validations:
+      required: true
+  - type: input
+    id: locks
+    attributes:
+      label: Locks and setup
+      description: >-
+        Lock models, e.g. Bold Classic with the Classic Upgrade; whether they
+        have a Bold Connect; whether Home Assistant has Bluetooth, e.g. an
+        ESPHome Bluetooth proxy.
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >-
+        Settings → Devices & services → Bold Smart Lock → ⋮ → Download
+        diagnostics, then drag the file here. Personal details and keys are
+        removed from it.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug logs
+      description: >-
+        ⋮ → Enable debug logging, reproduce the problem, then disable it to
+        download the log. Paste the lines about Bold.
+      render: text
