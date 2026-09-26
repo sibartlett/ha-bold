@@ -271,6 +271,7 @@ pre-commit install  # runs ruff and mypy before each commit
 pytest --cov=custom_components.bold
 python script/translations.py  # after changing strings.json
 pytest --snapshot-update  # after changing entities or diagnostics; review the diff
+HYPOTHESIS_PROFILE=thorough pytest tests/test_fuzz.py  # after changing parsing
 ```
 
 CI also runs the tests against the oldest Home Assistant version in

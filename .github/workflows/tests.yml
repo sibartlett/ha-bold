@@ -29,14 +29,15 @@ jobs:
       matrix:
         include:
           - name: pinned
-            requirements: -r requirements_test.txt
           # The minimum version in hacs.json: Home Assistant 2026.8.0.
           - name: minimum
-            requirements: pytest-homeassistant-custom-component==0.13.354
+            homeassistant: pytest-homeassistant-custom-component==0.13.354
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-      - run: pip install ${{ matrix.requirements }}
+      - run: pip install -r requirements_test.txt
+      - if: matrix.homeassistant
+        run: pip install ${{ matrix.homeassistant }}
       - run: pytest --cov=custom_components.bold --cov-report=term-missing --cov-fail-under=100

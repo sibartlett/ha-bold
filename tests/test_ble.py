@@ -36,14 +36,19 @@ class FakeLock:
         chunk_size: int = 0,
         event_first: bool = False,
         reject_handshake: bool = False,
+        ack: bytes | None = None,
     ) -> None:
-        """Set how the lock answers: its result code, and how it sends replies."""
+        """Set how the lock answers: its result code, and how it sends replies.
+
+        With ack, the lock acknowledges commands with those bytes instead.
+        """
         self.session: BoldBleSession | None = None
         self.result = result
         self.activation_time = activation_time
         self.chunk_size = chunk_size
         self.event_first = event_first
         self.reject_handshake = reject_handshake
+        self.ack = ack
         self.commands: list[bytes] = []
         self._nonce = os.urandom(13)
         self._server_challenge = os.urandom(8)
@@ -91,7 +96,9 @@ class FakeLock:
         elif packet_type == PACKET_COMMAND:
             assert self._cryptor is not None
             self.commands.append(self._cryptor.process(payload))
-            ack = bytes([self.result]) + self.activation_time.to_bytes(2, "little")
+            ack = self.ack
+            if ack is None:
+                ack = bytes([self.result]) + self.activation_time.to_bytes(2, "little")
             self._send(encode_packet(PACKET_COMMAND_ACK, self._cryptor.process(ack)))
         else:
             pytest.fail(f"Unexpected packet {packet_type:#x}")
