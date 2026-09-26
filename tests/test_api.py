@@ -42,6 +42,7 @@ from .conftest import GATEWAY_ID, LOCK, LOCK_ID, event_payload
         ("1500 milliseconds", timedelta(seconds=1.5)),
         ("PT5S", timedelta(seconds=5)),
         ("PT1H30M", timedelta(hours=1, minutes=30)),
+        ("P1DT2H", timedelta(days=1, hours=2)),
         ("forever", None),
         ("5 fortnights", None),
         (None, None),
@@ -91,6 +92,58 @@ def test_device_from_api_minimal() -> None:
     assert device.battery_level is None
     assert not device.remote_access
     assert device.gateway_id is None
+
+
+def test_device_model_name() -> None:
+    """Test the model's name is used when it has no description."""
+    device = BoldDevice.from_api({"id": 9, "model": {"name": "SX45"}})
+    assert device.model_name == "SX45"
+
+
+def test_event_fields_by_type() -> None:
+    """Test fields are only taken from the event types that carry them."""
+    time = "2026-09-24T12:00:00Z"
+    # Remote activations are flagged, and IDs must be numbers.
+    event = BoldEvent.from_api(
+        {"id": "7", "type": "DeviceActivation", "time": time, "remoteActivation": True}
+    )
+    assert event.id is None
+    assert event.remote_activation
+    # Only lock events carry a bolt position.
+    assert (
+        BoldEvent.from_api(
+            {"type": "DeviceActivation", "time": time, "status": "Locked"}
+        ).bolt_locked
+        is None
+    )
+    # Debug events only carry the voltage at rest, in their body.
+    debug = BoldEvent.from_api(
+        {
+            "type": "DeviceDebug",
+            "time": time,
+            "body": {"voltageIdle": 3061, "voltageUnderLoad": 2945, "uptime": 99},
+        }
+    )
+    assert (debug.voltage_idle, debug.voltage_under_load, debug.uptime) == (
+        3.061,
+        None,
+        99,
+    )
+    # Status events carry both, at the top level, to the millivolt.
+    status = BoldEvent.from_api(
+        {
+            "type": "DeviceStatus",
+            "time": time,
+            "voltageIdle": 3061.4,
+            "voltageUnderLoad": 1,
+        }
+    )
+    assert (status.voltage_idle, status.voltage_under_load) == (3.061, 0.001)
+    # Other events carry neither.
+    other = BoldEvent.from_api(
+        {"type": "DeviceBoot", "time": time, "voltageIdle": 3061}
+    )
+    assert other.voltage_idle is None
 
 
 def test_device_from_api_malformed() -> None:
@@ -205,13 +258,19 @@ async def test_get_devices_paginates(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Test all pages of devices are fetched."""
-    first_page = [{**LOCK, "id": i} for i in range(PAGE_SIZE)]
-    aioclient_mock.get(f"{API_URL}/v2/devices", params={"offset": 0}, json=first_page)
-    aioclient_mock.get(
-        f"{API_URL}/v2/devices", params={"offset": PAGE_SIZE}, json=[LOCK]
-    )
+    full_page = [{**LOCK, "id": i} for i in range(PAGE_SIZE)]
+    for offset, page in (
+        (0, full_page),
+        (PAGE_SIZE, full_page),
+        (2 * PAGE_SIZE, [LOCK]),
+    ):
+        aioclient_mock.get(
+            f"{API_URL}/v2/devices",
+            params={"offset": offset, "size": PAGE_SIZE},
+            json=page,
+        )
     devices = await _client(hass).get_devices()
-    assert len(devices) == PAGE_SIZE + 1
+    assert len(devices) == 2 * PAGE_SIZE + 1
     assert aioclient_mock.mock_calls[0][3] == {"Authorization": "Bearer token"}
 
 
@@ -240,14 +299,18 @@ async def test_get_events_filters(
     url = aioclient_mock.mock_calls[0][1]
     assert url.query["deviceId"] == "1 5"
     assert url.query["from"] == since.isoformat()
+    assert url.query["size"] == str(PAGE_SIZE)
+    assert url.query["offset"] == "0"
 
 
 @pytest.mark.parametrize(
     ("status", "error"),
     [
+        (400, BoldError),
         (401, BoldAuthError),
         (403, BoldForbiddenError),
         (429, BoldRateLimitError),
+        (500, BoldError),
     ],
 )
 async def test_http_errors(
@@ -287,7 +350,21 @@ async def test_command_errors(
         f"{API_URL}/v1/devices/{LOCK_ID}/remote-deactivation",
         json={"deviceId": LOCK_ID, "errorCode": code, "errorMessage": "nope"},
     )
-    with pytest.raises(error):
+    with pytest.raises(error, match="^nope$") as caught:
+        await _client(hass).remote_deactivation(LOCK_ID)
+    if isinstance(caught.value, BoldCommandError):
+        assert caught.value.code == code
+
+
+async def test_command_error_without_message(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a command error without a message is described by its code."""
+    aioclient_mock.post(
+        f"{API_URL}/v1/devices/{LOCK_ID}/remote-deactivation",
+        json={"deviceId": LOCK_ID, "errorCode": "SomethingElse"},
+    )
+    with pytest.raises(BoldCommandError, match="^SomethingElse$"):
         await _client(hass).remote_deactivation(LOCK_ID)
 
 
@@ -295,6 +372,8 @@ async def test_command_errors(
     ("token_error", "error"),
     [
         (ClientResponseError(Mock(), (), status=400), BoldAuthError),
+        (ClientResponseError(Mock(), (), status=499), BoldAuthError),
+        (ClientResponseError(Mock(), (), status=500), BoldConnectionError),
         (ClientResponseError(Mock(), (), status=503), BoldConnectionError),
         (ClientConnectionError(), BoldConnectionError),
     ],
@@ -373,11 +452,14 @@ async def test_get_bluetooth_keys(
     aioclient_mock.get(f"{API_URL}/v2/controller/commands", json=[{"deviceId": 1}])
     client = _client(hass)
     assert await client.get_bluetooth_handshakes([1, 5]) == [{"deviceId": 1}]
-    assert await client.get_bluetooth_commands([1, 5], ["Activate"]) == [
+    assert await client.get_bluetooth_commands([1, 5], ["Activate", "Deactivate"]) == [
         {"deviceId": 1}
     ]
     assert aioclient_mock.mock_calls[0][1].query["deviceIds"] == "1,5"
-    assert aioclient_mock.mock_calls[1][1].query["commandTypes"] == "Activate"
+    assert aioclient_mock.mock_calls[1][1].query["deviceIds"] == "1,5"
+    assert (
+        aioclient_mock.mock_calls[1][1].query["commandTypes"] == "Activate,Deactivate"
+    )
 
     aioclient_mock.clear_requests()
     aioclient_mock.get(f"{API_URL}/v2/controller/handshakes", json=["not an object"])

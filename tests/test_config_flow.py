@@ -28,6 +28,7 @@ async def _authorize(
     aioclient_mock: AiohttpClientMocker,
     result: dict,
     account_id: int = ACCOUNT_ID,
+    account: dict | None = None,
 ) -> dict:
     """Complete the OAuth dance and return the final flow result."""
     state = config_entry_oauth2_flow._encode_jwt(  # noqa: SLF001
@@ -56,7 +57,14 @@ async def _authorize(
     )
     aioclient_mock.get(
         f"{API_URL}/v1/account",
-        json={"id": account_id, "firstName": "Ada", "lastName": "Lovelace"},
+        json={
+            "id": account_id,
+            **(
+                {"firstName": "Ada", "lastName": "Lovelace"}
+                if account is None
+                else account
+            ),
+        },
     )
     return await hass.config_entries.flow.async_configure(result["flow_id"])
 
@@ -64,19 +72,37 @@ async def _authorize(
 @pytest.mark.usefixtures(
     "current_request_with_host", "setup_credentials", "mock_setup_entry"
 )
+@pytest.mark.parametrize(
+    ("account", "title"),
+    [
+        ({"firstName": "Ada", "lastName": "Lovelace"}, "Ada Lovelace"),
+        ({"email": "ada@example.com"}, "ada@example.com"),
+        ({}, "Bold"),
+    ],
+    ids=["name", "email", "neither"],
+)
 async def test_full_flow(
     hass: HomeAssistant,
     hass_client_no_auth: ClientSessionGenerator,
     aioclient_mock: AiohttpClientMocker,
+    account: dict,
+    title: str,
 ) -> None:
-    """Test setting up an account."""
+    """Test setting up an account, named after its owner."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
-    result = await _authorize(hass, hass_client_no_auth, aioclient_mock, result)
+    result = await _authorize(
+        hass, hass_client_no_auth, aioclient_mock, result, account=account
+    )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Ada Lovelace"
+    assert result["title"] == title
+    # The account is fetched with the new token.
+    (account_call,) = [
+        call for call in aioclient_mock.mock_calls if "/v1/account" in str(call[1])
+    ]
+    assert account_call[3] == {"Authorization": "Bearer new-access-token"}
     assert result["result"].unique_id == str(ACCOUNT_ID)
     assert result["data"]["token"]["access_token"] == "new-access-token"
 

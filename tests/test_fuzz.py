@@ -67,7 +67,6 @@ KEYS = [
     "actualFirmwareVersion",
     "requiredFirmwareVersion",
     "batteryLevel",
-    "batteryLastMeasurement",
     "isActiveUntil",
     "lockedStatus",
     "locked",

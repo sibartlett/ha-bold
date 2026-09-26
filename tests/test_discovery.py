@@ -101,18 +101,18 @@ async def test_discovery_only_once(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.parametrize(
-    "entry",
+    "entry_options",
     [
-        MockConfigEntry(domain=DOMAIN, unique_id="42"),
-        MockConfigEntry(domain=DOMAIN, unique_id=DOMAIN, source=SOURCE_IGNORE),
+        {"unique_id": "42"},
+        {"unique_id": DOMAIN, "source": SOURCE_IGNORE},
     ],
     ids=["configured", "ignored"],
 )
 async def test_discovery_when_set_up_or_ignored(
-    hass: HomeAssistant, entry: MockConfigEntry
+    hass: HomeAssistant, entry_options: dict[str, str]
 ) -> None:
     """Test discovery doesn't offer setup once Bold is set up or ignored."""
-    entry.add_to_hass(hass)
+    MockConfigEntry(domain=DOMAIN, **entry_options).add_to_hass(hass)
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_DHCP}, data=CONNECT_DHCP
     )

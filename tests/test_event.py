@@ -141,6 +141,8 @@ async def test_other_events_ignored(
         [
             event_payload(10, "DeviceStatus", "2026-09-24T12:00:10Z", uptime=5),
             other_device,
+            # A bolt position the lock couldn't determine.
+            event_payload(12, "DeviceLocked", "2026-09-24T12:00:10Z", status="Unknown"),
         ],
     )
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)

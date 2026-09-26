@@ -127,6 +127,19 @@ async def test_failed_poll_keeps_devices(
 
     assert _device(device_registry, init_integration, LOCK_ID) is not None
     assert hass.states.get("lock.front_door").state == "unavailable"
+    error = init_integration.runtime_data.devices.last_exception
+    assert error.translation_domain == DOMAIN
+    assert error.translation_key == "update_failed"
+    assert "HTTP 500" in error.translation_placeholders["error"]
+
+    # Events failing are reported the same way.
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=[LOCK, GATEWAY])
+    aioclient_mock.get(f"{API_URL}/v2/events", status=500)
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    error = init_integration.runtime_data.events.last_exception
+    assert error.translation_key == "update_failed"
+    assert "HTTP 500" in error.translation_placeholders["error"]
 
 
 async def test_remove_stale_device(

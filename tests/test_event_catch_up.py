@@ -126,6 +126,12 @@ async def test_late_event_caught_up(
         hass.states.get(ENTITY_ID).attributes["time"]
         == (START + timedelta(minutes=4)).isoformat()
     )
+    # Once the 12:04 unlock is seen, regular polls look back to 12:02.
+    assert {
+        since
+        for now, since in event_log.requested_since
+        if now > START + timedelta(minutes=4) and now - since < timedelta(hours=1)
+    } == {START + timedelta(minutes=2)}
 
     await _run_until(hass, freezer, START + timedelta(minutes=10, seconds=30))
     # It fires, and says when it actually happened.

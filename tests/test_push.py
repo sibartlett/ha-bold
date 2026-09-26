@@ -24,6 +24,7 @@ from custom_components.bold.const import (
     EVENT_SCAN_INTERVAL,
     PUSHED_EVENT_TYPES,
 )
+from custom_components.bold.diagnostics import async_get_config_entry_diagnostics
 from custom_components.bold.push import (
     CONF_BOLD_WEBHOOKS,
     CONF_CLOUDHOOK_URL,
@@ -101,6 +102,8 @@ async def test_webhook_registered(
         "secretHttp": mock_config_entry.data[CONF_WEBHOOK_SECRET],
     }
     assert mock_config_entry.data[CONF_BOLD_WEBHOOKS] == {str(ORGANIZATION_ID): 99}
+    (listing,) = _calls(aioclient_mock, "GET", WEBHOOKS)
+    assert listing[1].query["organizationId"] == str(ORGANIZATION_ID)
     events = mock_config_entry.runtime_data.events
     assert events.push_active
     assert events.update_interval == EVENT_PUSH_SCAN_INTERVAL
@@ -145,6 +148,102 @@ async def test_webhook_reused_after_restart(
     assert len(_calls(aioclient_mock, "DELETE", f"{WEBHOOKS}/100")) == 1
     # Someone else's webhook is left alone.
     assert not _calls(aioclient_mock, "DELETE", f"{WEBHOOKS}/101")
+    assert mock_config_entry.data[CONF_BOLD_WEBHOOKS] == {str(ORGANIZATION_ID): 99}
+
+
+@pytest.mark.parametrize(
+    ("stored", "existing_url"),
+    [
+        # Home Assistant's address changed, but Bold's ID was stored.
+        ({str(ORGANIZATION_ID): 99}, "https://old.example.com/api/webhook/old"),
+        # The ID wasn't stored, but the URL is the same...
+        ({}, "https://ha.example.com/api/webhook/abc"),
+        # ...or only the host changed.
+        ({}, "https://old.example.com/api/webhook/abc"),
+    ],
+    ids=["stored ID", "same URL", "same path"],
+)
+async def test_webhook_recognised(
+    hass: HomeAssistant,
+    external_url: str,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    stored: dict[str, int],
+    existing_url: str,
+) -> None:
+    """Test each way an existing webhook is recognised as ours, and updated."""
+    mock_config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        mock_config_entry,
+        data={
+            **mock_config_entry.data,
+            CONF_WEBHOOK_ID: "abc",
+            CONF_WEBHOOK_SECRET: "secret",
+            CONF_BOLD_WEBHOOKS: stored,
+        },
+    )
+    _mock_bold(
+        aioclient_mock, existing=[{"id": 99, "webhookUrl": existing_url, "types": []}]
+    )
+    await _setup(hass, mock_config_entry)
+
+    assert not _calls(aioclient_mock, "POST", WEBHOOKS)
+    (update,) = _calls(aioclient_mock, "PUT", f"{WEBHOOKS}/99")
+    assert update[2]["webhookUrl"] == f"{external_url}/api/webhook/abc"
+    assert mock_config_entry.data[CONF_BOLD_WEBHOOKS] == {str(ORGANIZATION_ID): 99}
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"internal_url": "http://homeassistant.local:8123"},
+        {"external_url": "https://203.0.113.5:8123"},
+    ],
+    ids=["internal URL", "IP address"],
+)
+async def test_no_webhook_to_unreachable_url(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    config: dict[str, str],
+) -> None:
+    """Test Bold isn't given an address on the LAN, or a bare IP address."""
+    await async_process_ha_core_config(hass, config)
+    _mock_bold(aioclient_mock)
+    await _setup(hass, mock_config_entry)
+    assert not _calls(aioclient_mock, "GET", WEBHOOKS)
+    assert not mock_config_entry.runtime_data.events.push_active
+
+
+@pytest.mark.parametrize(
+    "lock",
+    [
+        {**LOCK, "features": {**LOCK["features"], "eventLog": False}},
+        {**LOCK, "owner": {}},
+    ],
+    ids=["no event log", "no organization"],
+)
+async def test_no_webhook_without_event_log(
+    hass: HomeAssistant,
+    external_url: str,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    lock: dict,
+) -> None:
+    """Test webhooks are only set up for organizations with event logs."""
+    _mock_bold(aioclient_mock)
+    aioclient_mock._mocks = [  # noqa: SLF001
+        mock
+        for mock in aioclient_mock._mocks  # noqa: SLF001
+        if "/v2/devices" not in str(mock.url)
+    ]
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=[lock, GATEWAY])
+    await _setup(hass, mock_config_entry)
+    assert not _calls(aioclient_mock, "GET", WEBHOOKS)
+    assert not mock_config_entry.runtime_data.events.push_active
 
 
 async def test_webhook_refused(
@@ -204,6 +303,10 @@ async def test_cloudhook(
         await _setup(hass, mock_config_entry)
         (create,) = _calls(aioclient_mock, "POST", WEBHOOKS)
         assert create[2]["webhookUrl"] == "https://hooks.nabu.casa/hook"
+        cloud.async_active_subscription.assert_called_with(hass)
+        cloud.async_create_cloudhook.assert_awaited_once_with(
+            hass, mock_config_entry.data[CONF_WEBHOOK_ID]
+        )
         assert mock_config_entry.data[CONF_CLOUDHOOK_URL] == (
             "https://hooks.nabu.casa/hook"
         )
@@ -273,6 +376,22 @@ async def test_pushed_events(
     await hass.async_block_till_done()
     assert hass.states.get(ACTIVITY).state == fired_at
     assert mock_config_entry.runtime_data.events.push_active
+
+    # A single event, not in a list, is handled too.
+    unlocked = {**pushed, "time": "2026-09-24T12:00:02Z", "status": "Unlocked"}
+    response = await client.post(path, json=unlocked, headers={"X-Bold-Secret": secret})
+    assert response.status == 200
+    await hass.async_block_till_done()
+    assert hass.states.get(ACTIVITY).attributes["event_type"] == "unlocked"
+
+    # Diagnostics show pushes arriving.
+    diagnostics = await async_get_config_entry_diagnostics(hass, mock_config_entry)
+    assert diagnostics["push"] == {
+        "active": True,
+        "last_push": "2026-09-24T12:05:00+00:00",
+        "bold_webhooks": 1,
+        "cloudhook": False,
+    }
 
 
 async def test_missed_push_polls_faster(

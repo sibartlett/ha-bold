@@ -1,6 +1,6 @@
 """Tests for Bold repair issues."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.select import (
@@ -10,6 +10,7 @@ from homeassistant.components.select import (
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_OPTION
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.util import dt as dt_util
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -56,6 +57,11 @@ async def _setup(
     await setup_integration(hass, mock_config_entry, aioclient_mock, devices)
 
 
+def _local(time: str) -> str:
+    """Format a time as issues show it, in Home Assistant's time zone."""
+    return dt_util.as_local(datetime.fromisoformat(time)).strftime("%Y-%m-%d %H:%M")
+
+
 def _issue(issue_registry: ir.IssueRegistry, issue_id: str) -> ir.IssueEntry | None:
     return issue_registry.async_get_issue(DOMAIN, issue_id)
 
@@ -78,8 +84,11 @@ async def test_connect_offline(
     assert issue.translation_key == "connect_offline"
     assert issue.severity is ir.IssueSeverity.WARNING
     assert not issue.is_fixable
-    assert issue.translation_placeholders["name"] == "Bold Connect"
-    assert issue.translation_placeholders["locks"] == "Front Door"
+    assert issue.translation_placeholders == {
+        "name": "Bold Connect",
+        "locks": "Front Door",
+        "last_seen": _local("2026-09-24T10:30:00+00:00"),
+    }
 
     _mock_devices(aioclient_mock, [LOCK, _connect("2026-09-24T12:09:00Z")])
     await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
@@ -154,10 +163,24 @@ async def test_lock_without_bluetooth_or_connect(
     issue_registry: ir.IssueRegistry,
 ) -> None:
     """Test an issue for a lock without a Connect, with no Bluetooth in Home Assistant."""
-    await _setup(hass, mock_config_entry, aioclient_mock, [{**LOCK, "gateway": None}])
-    assert _issue(issue_registry, NO_ROUTE_ISSUE).translation_placeholders == {
-        "name": "Front Door"
-    }
+    await _setup(
+        hass,
+        mock_config_entry,
+        aioclient_mock,
+        [
+            # A lock reachable through its Connect doesn't stop the others
+            # being checked.
+            LOCK,
+            GATEWAY,
+            {**LOCK, "id": 5, "name": "Garage", "gateway": None},
+            {**LOCK, "id": 6, "name": "Shed", "gateway": None},
+        ],
+    )
+    assert _issue(issue_registry, NO_ROUTE_ISSUE) is None
+    for lock_id, name in ((5, "Garage"), (6, "Shed")):
+        issue = _issue(issue_registry, f"lock_no_route_{lock_id}")
+        assert issue.translation_key == "lock_no_route"
+        assert issue.translation_placeholders == {"name": name}
 
 
 async def test_lock_out_of_bluetooth_range(
@@ -181,6 +204,8 @@ async def test_lock_out_of_bluetooth_range(
     for _ in range(6):
         await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
     issue = _issue(issue_registry, OUT_OF_RANGE_ISSUE)
+    assert issue.translation_key == "lock_out_of_range"
+    assert set(issue.translation_placeholders) == {"name", "since"}
     assert issue.translation_placeholders["name"] == "Front Door"
 
     # Heard again, it's cleared.

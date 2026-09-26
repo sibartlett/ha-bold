@@ -327,6 +327,7 @@ class FakeBluetooth:
         self.reachable: set[int] = {LOCK_ID}
         self.ble_device = object()
         self.sent: list[bytes] = []
+        self.timeouts: list[float] = []
         self.error: Exception | None = None
         self.activation_time = 15
         self.disconnects = 0
@@ -345,6 +346,7 @@ class FakeBluetooth:
         disconnect_later: Callable[[Coroutine[Any, Any, None]], None] | None = None,
     ) -> int:
         """Check the keys, and record the command, like async_send_command."""
+        self.timeouts.append(timeout)
         assert ble_device is self.ble_device
         assert handshake_key == HANDSHAKE_KEY
         assert handshake_payload == HANDSHAKE_PAYLOAD

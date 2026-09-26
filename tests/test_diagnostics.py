@@ -5,6 +5,11 @@ import json
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.diagnostics import REDACTED
+from homeassistant.components.select import (
+    DOMAIN as SELECT_DOMAIN,
+    SERVICE_SELECT_OPTION,
+)
+from homeassistant.const import ATTR_ENTITY_ID, ATTR_OPTION
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -77,11 +82,20 @@ async def test_diagnostics_bluetooth(
     init_integration: MockConfigEntry,
 ) -> None:
     """Test diagnostics describe Bluetooth keys without including them."""
+    await hass.services.async_call(
+        SELECT_DOMAIN,
+        SERVICE_SELECT_OPTION,
+        {
+            ATTR_ENTITY_ID: "select.front_door_unlock_method",
+            ATTR_OPTION: "prefer_bluetooth",
+        },
+        blocking=True,
+    )
     diagnostics = await async_get_config_entry_diagnostics(hass, init_integration)
     expires = "2099-01-01T00:00:00+00:00"
     assert diagnostics["bluetooth"]["locks"][str(LOCK_ID)] == {
         "reachable": True,
-        "unlock_method": "prefer_connect",
+        "unlock_method": "prefer_bluetooth",
         "handshake_expires": expires,
         "commands": {"Activate": expires, "Deactivate": expires},
     }

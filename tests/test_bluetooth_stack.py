@@ -1,14 +1,19 @@
 """Tests for the parts of Bluetooth support that touch the radio and storage."""
 
+from datetime import timedelta
 import sys
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from bleak.exc import BleakError
+from bleak_retry_connector import BleakClientWithServiceCache
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.bluetooth import BluetoothServiceInfo
+from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 import pytest
 
 from custom_components.bold.boldsmartlock import BoldClient
@@ -30,7 +35,7 @@ from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.keys import BoldBluetoothKeys
 from custom_components.bold.tracker import BoldBluetoothTracker
 
-from .conftest import LOCK_ID, mock_bluetooth_keys
+from .conftest import HANDSHAKE_KEY as CLOUD_HANDSHAKE_KEY, LOCK_ID, mock_bluetooth_keys
 from .test_ble import ACTIVATE_COMMAND, HANDSHAKE_KEY, HANDSHAKE_PAYLOAD, FakeLock
 
 ADDRESS = "AA:BB:CC:00:00:01"
@@ -76,11 +81,12 @@ async def test_send_command_over_bleak() -> None:
     """Test a command end to end through a Bleak client."""
     lock = FakeLock()
     client = FakeBleakClient(lock)
+    ble_device = SimpleNamespace(name=None, address=ADDRESS)
     with patch(
         "bleak_retry_connector.establish_connection", AsyncMock(return_value=client)
-    ):
+    ) as establish_connection:
         activation_time = await async_send_command(
-            SimpleNamespace(name="lock", address=ADDRESS),  # type: ignore[arg-type]
+            ble_device,  # type: ignore[arg-type]
             HANDSHAKE_KEY,
             HANDSHAKE_PAYLOAD,
             ACTIVATE_COMMAND,
@@ -88,6 +94,35 @@ async def test_send_command_over_bleak() -> None:
         )
     assert activation_time == 15
     assert lock.commands == [ACTIVATE_COMMAND]
+    assert client.disconnected
+    # A device without a name is named by its address.
+    establish_connection.assert_awaited_once_with(
+        BleakClientWithServiceCache, ble_device, ADDRESS, max_attempts=2
+    )
+
+
+async def test_send_command_times_out() -> None:
+    """Test a lock that never replies times out, and is disconnected."""
+    lock = FakeLock()
+    client = FakeBleakClient(lock)
+
+    async def silent(_packet: bytes) -> None:
+        """Never reply."""
+
+    lock.write = silent  # type: ignore[method-assign]
+    with (
+        patch(
+            "bleak_retry_connector.establish_connection", AsyncMock(return_value=client)
+        ),
+        pytest.raises(BoldBluetoothError, match="Timed out"),
+    ):
+        await async_send_command(
+            SimpleNamespace(name="lock", address=ADDRESS),  # type: ignore[arg-type]
+            HANDSHAKE_KEY,
+            HANDSHAKE_PAYLOAD,
+            ACTIVATE_COMMAND,
+            timeout=0.05,
+        )
     assert client.disconnected
 
 
@@ -234,11 +269,15 @@ def fake_bluetooth_integration(hass: HomeAssistant) -> MagicMock:
 
 
 async def test_tracker(
-    hass: HomeAssistant, fake_bluetooth_integration: MagicMock
+    hass: HomeAssistant,
+    fake_bluetooth_integration: MagicMock,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     """Test following a lock appearing, disappearing and moving."""
     entry = MagicMock()
+    started = dt_util.utcnow()
     tracker = BoldBluetoothTracker(hass)
+    freezer.tick(timedelta(minutes=1))
     changes: list[bool] = []
     tracker.async_add_listener(
         LOCK_ID, lambda: changes.append(tracker.is_reachable(LOCK_ID))
@@ -254,10 +293,18 @@ async def test_tracker(
         hass, ADDRESS, connectable=True
     )
 
+    assert tracker.rssi(LOCK_ID) == -70
+    assert tracker.unreachable_since(LOCK_ID) is None
+
     # The lock stops advertising.
+    freezer.tick(timedelta(minutes=5))
     unavailable = fake_bluetooth_integration.async_track_unavailable.call_args[0][1]
     unavailable(LOCK_ADVERTISEMENT)
     assert changes == [True, False]
+    assert tracker.rssi(LOCK_ID) is None
+    # Out of range since it was last heard; a lock never heard, since startup.
+    assert tracker.unreachable_since(LOCK_ID) == started + timedelta(minutes=1)
+    assert tracker.unreachable_since(999) == started
 
     # It comes back, via the advertisement callback.
     on_advertisement = fake_bluetooth_integration.async_register_callback.call_args[0][
@@ -297,17 +344,29 @@ async def test_keys_survive_restart(
 
     mock_bluetooth_keys(aioclient_mock)
     client = BoldClient(async_get_clientsession(hass), token)
-    keys = BoldBluetoothKeys(hass, "entry", client)
-    await keys.async_refresh([LOCK_ID])
-    stored = hass_storage["bold.entry.bluetooth_keys"]["data"]["locks"]
-    assert set(stored[str(LOCK_ID)]["commands"]) == {"Activate", "Deactivate"}
+    created: list[dict[str, Any]] = []
 
-    restarted = BoldBluetoothKeys(hass, "entry", client)
-    await restarted.async_load()
-    assert restarted.command(LOCK_ID, "Activate") == keys.command(LOCK_ID, "Activate")
+    class RecordingStore[T](Store[T]):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            created.append(kwargs)
+            super().__init__(*args, **kwargs)
 
-    await BoldBluetoothKeys.async_remove_stored(hass, "entry")
-    assert "bold.entry.bluetooth_keys" not in hass_storage
+    with patch("custom_components.bold.keys.Store", RecordingStore):
+        keys = BoldBluetoothKeys(hass, "entry", client)
+        await keys.async_refresh([LOCK_ID])
+        stored = hass_storage["bold.entry.bluetooth_keys"]["data"]["locks"]
+        assert set(stored[str(LOCK_ID)]["commands"]) == {"Activate", "Deactivate"}
+
+        # All of the keys come back after a restart.
+        restarted = BoldBluetoothKeys(hass, "entry", client)
+        await restarted.async_load()
+        assert restarted.get(LOCK_ID) == keys.get(LOCK_ID)
+        assert restarted.get(LOCK_ID).handshake_key.value == CLOUD_HANDSHAKE_KEY
+
+        await BoldBluetoothKeys.async_remove_stored(hass, "entry")
+        assert "bold.entry.bluetooth_keys" not in hass_storage
+    # The keys unlock the door, so they're stored privately.
+    assert [kwargs["private"] for kwargs in created] == [True, True, True]
 
 
 async def test_keys_ignore_invalid(

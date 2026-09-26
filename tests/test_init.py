@@ -177,3 +177,5 @@ async def test_event_poll_auth_error_starts_reauth(
 
     flows = hass.config_entries.flow.async_progress()
     assert [flow["context"]["source"] for flow in flows] == [SOURCE_REAUTH]
+    error = init_integration.runtime_data.events.last_exception
+    assert (error.translation_domain, error.translation_key) == (DOMAIN, "auth_failed")

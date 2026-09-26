@@ -1,7 +1,9 @@
 """Tests for the Bold Bluetooth protocol."""
 
 import os
+from typing import Any
 
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 import pytest
 
 from custom_components.bold.boldsmartlock.ble import (
@@ -37,10 +39,13 @@ class FakeLock:
         event_first: bool = False,
         reject_handshake: bool = False,
         ack: bytes | None = None,
+        finish_status: int = 0x00,
+        echo_challenge: bool = True,
     ) -> None:
         """Set how the lock answers: its result code, and how it sends replies.
 
         With ack, the lock acknowledges commands with those bytes instead.
+        finish_status and echo_challenge make it finish the handshake wrongly.
         """
         self.session: BoldBleSession | None = None
         self.result = result
@@ -49,6 +54,8 @@ class FakeLock:
         self.event_first = event_first
         self.reject_handshake = reject_handshake
         self.ack = ack
+        self.finish_status = finish_status
+        self.echo_challenge = echo_challenge
         self.commands: list[bytes] = []
         self._nonce = os.urandom(13)
         self._server_challenge = os.urandom(8)
@@ -87,10 +94,11 @@ class FakeLock:
             client_response = cryptor.process(payload)
             assert client_response[:8] == expected_challenge, "bad handshake"
             self._cryptor = BoldCryptor(client_response, self._nonce)
+            challenge = client_response[8:] if self.echo_challenge else bytes(8)
             self._send(
                 encode_packet(
                     PACKET_HANDSHAKE_FINISHED,
-                    self._cryptor.process(b"\x00" + client_response[8:]),
+                    self._cryptor.process(bytes([self.finish_status]) + challenge),
                 )
             )
         elif packet_type == PACKET_COMMAND:
@@ -111,12 +119,14 @@ def _session(lock: FakeLock) -> BoldBleSession:
 
 
 @pytest.mark.parametrize(
-    "lock",
-    [FakeLock(), FakeLock(chunk_size=20), FakeLock(chunk_size=1, event_first=True)],
+    "options",
+    [{}, {"chunk_size": 20}, {"chunk_size": 1, "event_first": True}],
     ids=["whole", "20-byte chunks", "bytewise with events"],
 )
-async def test_activate(lock: FakeLock) -> None:
+async def test_activate(options: dict[str, Any]) -> None:
     """Test a handshake and command against a simulated lock."""
+    # A new lock each run: it records the commands it receives.
+    lock = FakeLock(**options)
     session = _session(lock)
     await session.handshake(HANDSHAKE_KEY, HANDSHAKE_PAYLOAD)
     assert await session.command(ACTIVATE_COMMAND) == 15
@@ -152,6 +162,47 @@ async def test_command_needs_handshake() -> None:
         await _session(FakeLock()).command(ACTIVATE_COMMAND)
 
 
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"finish_status": 0x01}, "failed the handshake"),
+        ({"echo_challenge": False}, "failed the handshake"),
+    ],
+    ids=["bad status", "wrong challenge"],
+)
+async def test_lock_fails_handshake(options: dict[str, Any], message: str) -> None:
+    """Test the lock must both report success and return our challenge."""
+    with pytest.raises(BoldBluetoothError, match=message):
+        await _session(FakeLock(**options)).handshake(HANDSHAKE_KEY, HANDSHAKE_PAYLOAD)
+
+
+async def test_longer_acknowledgement() -> None:
+    """Test the activation time is the two bytes after the result."""
+    session = _session(FakeLock(ack=b"\x00\x0f\x00\x07"))
+    await session.handshake(HANDSHAKE_KEY, HANDSHAKE_PAYLOAD)
+    assert await session.command(ACTIVATE_COMMAND) == 15
+
+
+def test_cryptor_known_answer() -> None:
+    """Test the IV is the nonce, two zero bytes and a block counter.
+
+    The simulated lock uses BoldCryptor too, so check it against AES-CTR
+    directly: that's what the real lock does.
+    """
+    key, nonce = bytes(range(16)), bytes(range(13))
+    first, second = bytes(40), bytes(20)
+
+    def aes_ctr(counter: int, data: bytes) -> bytes:
+        iv = nonce + bytes([0, 0, counter])
+        encryptor = Cipher(algorithms.AES(key), modes.CTR(iv)).encryptor()
+        return encryptor.update(data) + encryptor.finalize()
+
+    cryptor = BoldCryptor(key, nonce)
+    assert cryptor.process(first) == aes_ctr(0, first)
+    # 40 bytes used three 16-byte blocks, so the next message starts at 3.
+    assert cryptor.process(second) == aes_ctr(3, second)
+
+
 def test_cryptor_is_symmetric() -> None:
     """Test decrypting with the same key and nonce restores the data."""
     key, nonce, data = os.urandom(16), os.urandom(13), os.urandom(40)
@@ -171,3 +222,10 @@ def test_parse_advertisement() -> None:
     assert advertisement.events_available
     assert not advertisement.installable
     assert parse_advertisement(b"\x02\x01") is None
+    # The other flags, each a bit of the last byte.
+    advertisement = parse_advertisement(bytes.fromhex("02010301000000000000000d"))
+    assert advertisement is not None
+    assert advertisement.installable
+    assert not advertisement.events_available
+    assert advertisement.should_time_sync
+    assert advertisement.in_dfu_mode

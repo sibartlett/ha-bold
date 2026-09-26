@@ -224,6 +224,43 @@ async def test_activation_events(
     assert state.attributes["changed_by"] == "Grace"
 
 
+async def test_activation_event_lasts_its_activation_time(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test an activation stays unlocked for its activation time, from when it happened.
+
+    A deactivation from before it doesn't end it.
+    """
+    set_events(
+        mock_api,
+        [
+            event_payload(
+                100,
+                "DeviceActivation",
+                "2026-09-24T12:00:20+00:00",
+                result="Success",
+                activationTime=60,
+            ),
+        ],
+    )
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+    # A deactivation uploaded late, from before the activation.
+    set_events(
+        mock_api,
+        [event_payload(99, "DeviceDeactivation", "2026-09-24T12:00:10+00:00")],
+    )
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    await advance(hass, frozen_time, timedelta(seconds=15))
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+    await advance(hass, frozen_time, timedelta(seconds=10))
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+
+
 async def test_failed_activation_event_stays_locked(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

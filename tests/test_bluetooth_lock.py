@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.lock import (
@@ -34,7 +35,11 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 from custom_components.bold.boldsmartlock import COMMAND_ACTIVATE, COMMAND_DEACTIVATE
 from custom_components.bold.boldsmartlock.ble import BoldBluetoothError
 from custom_components.bold.boldsmartlock.const import API_URL
-from custom_components.bold.const import DEVICE_SCAN_INTERVAL
+from custom_components.bold.const import (
+    BLUETOOTH_FALLBACK_TIMEOUT,
+    BLUETOOTH_TIMEOUT,
+    DEVICE_SCAN_INTERVAL,
+)
 from custom_components.bold.keys import BoldLockKeys, BoldSecret
 
 from .conftest import (
@@ -109,6 +114,8 @@ async def test_unlock_prefers_bluetooth(
     await call_lock(hass, SERVICE_UNLOCK)
     assert fake_bluetooth.sent == [ACTIVATE_COMMAND]
     assert count_calls(mock_api, "remote-activation") == 0
+    # With the Connect to fall back to, Bluetooth gets less time.
+    assert fake_bluetooth.timeouts == [BLUETOOTH_FALLBACK_TIMEOUT]
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
     await call_lock(hass, SERVICE_LOCK)
@@ -192,6 +199,8 @@ async def test_bluetooth_only(
     with pytest.raises(HomeAssistantError, match="over Bluetooth failed"):
         await call_lock(hass, SERVICE_UNLOCK)
     assert count_calls(mock_api, "remote-activation") == 0
+    # As the only way, Bluetooth gets the full time.
+    assert fake_bluetooth.timeouts == [BLUETOOTH_TIMEOUT]
 
     # Out of range, there's no way to reach the lock.
     init_integration.runtime_data.bluetooth.async_mark_unreachable(LOCK_ID)
@@ -490,3 +499,18 @@ def test_expired_keys_unused() -> None:
     assert keys.command(COMMAND_DEACTIVATE, now) is None
     keys = BoldLockKeys(valid, expired, {COMMAND_ACTIVATE: valid})
     assert keys.command(COMMAND_ACTIVATE, now) is None
+
+
+async def test_keys_removed_with_integration(
+    hass: HomeAssistant,
+    fake_bluetooth: FakeBluetooth,
+    init_integration: MockConfigEntry,
+    hass_storage: dict[str, Any],
+) -> None:
+    """Test the stored Bluetooth keys, which unlock the door, go with the integration."""
+    key = f"bold.{init_integration.entry_id}.bluetooth_keys"
+    await hass.async_block_till_done()
+    assert key in hass_storage
+    await hass.config_entries.async_remove(init_integration.entry_id)
+    await hass.async_block_till_done()
+    assert key not in hass_storage
