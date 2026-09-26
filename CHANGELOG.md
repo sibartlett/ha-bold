@@ -20,8 +20,9 @@ scratch.
 
 ### Activity
 
-- An activity entity for each lock fires for activations (with who, and how:
-  PIN, button, app, key fob…), failed activations such as a wrong PIN,
+- An activity entity for each lock fires for activations (with how: PIN,
+  button or Bluetooth, which covers the app, Home Assistant and a Bold Connect;
+  and who, when Bold knows), failed activations such as a wrong PIN,
   deactivations, tamper alerts, and the bolt being locked or unlocked.
 - Pushed by Bold within seconds when Home Assistant is reachable from the
   internet (an external URL, or Home Assistant Cloud); polled otherwise.
