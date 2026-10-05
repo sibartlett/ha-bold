@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- A Bold Connect with its relay wired to a door, such as a building's
+  entrance, gets a lock to unlock that door, and an activity entity for who
+  opened it.
+
 ## 1.0.2 (2026-09-28)
 
 - No changes to the integration. HACS now installs it from a zip attached to

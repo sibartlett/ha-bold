@@ -62,6 +62,7 @@ class SettingsPayload(TypedDict, total=False):
 class FeaturesPayload(TypedDict, total=False):
     """What a device supports."""
 
+    activatable: bool
     remoteAccess: bool
     eventLog: bool
     lockedStatus: bool

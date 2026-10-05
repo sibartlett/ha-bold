@@ -65,6 +65,8 @@ async def async_setup_entry(
         lambda device: (
             [BoldLock(data, device)]
             if device.is_lock and (device.remote_access or data.bluetooth.enabled)
+            else [BoldConnectLock(data, device)]
+            if device.is_door_connect
             else []
         ),
     )
@@ -438,3 +440,75 @@ class BoldLock(BoldEntity, LockEntity):
     def _expired(self, _now: datetime) -> None:
         self._unsub_expiry = None
         self.async_write_ha_state()
+
+
+class BoldConnectLock(BoldEntity, LockEntity):
+    """A Bold Connect that opens a door itself, through Bold's cloud.
+
+    The Connect can't tell whether the door is locked: it shows as unlocked while
+    activated, and locked otherwise.
+    """
+
+    _attr_name = None
+    _attr_assumed_state = True
+
+    def __init__(self, data: BoldRuntimeData, device: BoldDevice) -> None:
+        """Initialize the lock."""
+        super().__init__(data.devices, device, None)
+        self._client = data.client
+        self._active_until: datetime | None = None
+        self._unsub_expiry: CALLBACK_TYPE | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Cancel the end of an activation when removed."""
+        await super().async_added_to_hass()
+        self.async_on_remove(self._cancel_expiry)
+
+    @property
+    def available(self) -> bool:
+        """Return whether the Connect can be activated remotely."""
+        return super().available and self.device.remote_access
+
+    @property
+    def is_locked(self) -> bool:
+        """Return whether the Connect isn't activated."""
+        return self._active_until is None or dt_util.utcnow() >= self._active_until
+
+    async def async_unlock(self, **kwargs: Any) -> None:
+        """Activate the Connect."""
+        try:
+            duration = await self._client.remote_activation(self.device_id)
+        except BoldError as err:
+            raise _command_error(err) from err
+        self._cancel_expiry()
+        self._active_until = dt_util.utcnow() + (
+            duration or self.device.activation_time or timedelta(0)
+        )
+        self._unsub_expiry = async_track_point_in_utc_time(
+            self.hass, self._expired, self._active_until
+        )
+        self.async_write_ha_state()
+
+    async def async_lock(self, **kwargs: Any) -> None:
+        """End an activation early."""
+        if self.is_locked:
+            return
+        try:
+            await self._client.remote_deactivation(self.device_id)
+        except BoldError as err:
+            raise _command_error(err) from err
+        self._cancel_expiry()
+        self._active_until = None
+        self.async_write_ha_state()
+
+    @callback
+    def _expired(self, _now: datetime) -> None:
+        self._unsub_expiry = None
+        self._active_until = None
+        self.async_write_ha_state()
+
+    @callback
+    def _cancel_expiry(self) -> None:
+        if self._unsub_expiry is not None:
+            self._unsub_expiry()
+            self._unsub_expiry = None

@@ -146,9 +146,7 @@ def _async_sync_devices(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
             ).id
 
     entry.runtime_data.events.device_ids = [
-        device.id
-        for device in devices.data.values()
-        if device.is_lock and device.event_log
+        device.id for device in devices.data.values() if device.has_activity
     ]
 
     for device_entry in dr.async_entries_for_config_entry(

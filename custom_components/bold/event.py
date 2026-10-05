@@ -36,9 +36,7 @@ async def async_setup_entry(
         entry,
         async_add_entities,
         lambda device: (
-            [BoldActivityEvent(events, device)]
-            if device.is_lock and device.event_log
-            else []
+            [BoldActivityEvent(events, device)] if device.has_activity else []
         ),
     )
 

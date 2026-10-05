@@ -14,7 +14,7 @@ firmware.
 | Device | Support |
 |---|---|
 | Bold Smart Cylinder | ✅ Tested with the Bold Classic, with and without the Classic Upgrade (which lets it report whether it's locked). The Bold Elite should be supported, but has not been tested. |
-| Bold Connect | ✅ Unlocks locks from anywhere, through Bold's cloud. |
+| Bold Connect | ✅ Unlocks locks from anywhere, through Bold's cloud. A Connect with its relay wired to a door, such as a building's entrance, can be unlocked itself. |
 | Bold Clicker (key fob) | ➖ Ignored. Its activity shows up on the lock it opens. |
 
 Home Assistant can unlock a lock in two ways:
@@ -98,6 +98,10 @@ Each Bold Connect is a device too, and the locks it serves are linked to it:
 | `binary_sensor.<connect>_connectivity` | Online while Bold has heard from the Connect in the last 30 minutes. |
 | `sensor.<connect>_last_seen` | When Bold last heard from the Connect. |
 | `update.<connect>_firmware` | Whether the Connect is on the firmware version Bold requires. |
+
+A Connect that opens a door itself also gets a `lock.<connect>`, which unlocks
+the door through Bold's cloud and shows as unlocked while activated, and an
+`event.<connect>_activity` for who opened it and how.
 
 Locks and Bold Connects added to your Bold account appear automatically, and
 ones removed from it are removed from Home Assistant.

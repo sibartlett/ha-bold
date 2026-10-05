@@ -133,7 +133,7 @@ async def _async_register_with_bold(
     organizations = {
         device.organization_id
         for device in data.devices.data.values()
-        if device.is_lock and device.event_log and device.organization_id is not None
+        if device.has_activity and device.organization_id is not None
     }
     stored: dict[str, int] = dict(entry.data.get(CONF_BOLD_WEBHOOKS, {}))
     path = webhook.async_generate_path(entry.data[CONF_WEBHOOK_ID])

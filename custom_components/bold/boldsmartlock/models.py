@@ -194,6 +194,7 @@ class BoldDevice:
     reports_bolt: bool
     bolt_locked: bool | None
     bolt_changed: datetime | None
+    activatable: bool
     remote_access: bool
     event_log: bool
     gateway_id: int | None
@@ -228,6 +229,7 @@ class BoldDevice:
             and _flag(settings.get("lockedStatus")),
             bolt_locked=_bolt_state(data.get("locked")),
             bolt_changed=parse_datetime(data.get("lastLocked")),
+            activatable=_flag(features.get("activatable")),
             remote_access=_flag(features.get("remoteAccess")),
             event_log=_flag(features.get("eventLog")),
             gateway_id=_int(gateway.get("id")),
@@ -246,6 +248,20 @@ class BoldDevice:
     def is_gateway(self) -> bool:
         """Return whether the device is a Bold Connect."""
         return self.type_id == DEVICE_TYPE_GATEWAY
+
+    @property
+    def is_door_connect(self) -> bool:
+        """Return whether the device is a Bold Connect that opens a door itself.
+
+        A Connect with its relay wired to a door, such as a building's entrance,
+        is activated like a lock, and has its own event log.
+        """
+        return self.is_gateway and self.activatable and self.remote_access
+
+    @property
+    def has_activity(self) -> bool:
+        """Return whether the device's activity is in Bold's event log."""
+        return (self.is_lock or self.is_door_connect) and self.event_log
 
     @property
     def update_available(self) -> bool:
