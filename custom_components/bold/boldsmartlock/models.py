@@ -369,3 +369,12 @@ class BoldEvent:
     def sort_key(self) -> tuple[datetime, int]:
         """Order events by time, then ID."""
         return (self.time, self.id or 0)
+
+    def time_no_later_than(self, now: datetime) -> datetime:
+        """Return when the event happened, no later than now.
+
+        A device's clock can run seconds ahead, but an event can't have
+        happened after it arrived. The time it was logged stays in `time`,
+        to recognise and order events.
+        """
+        return min(self.time, now)

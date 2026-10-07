@@ -86,9 +86,7 @@ class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
             ):
                 continue
             attributes: dict[str, str | int | bool | None] = {
-                # A device's clock can run ahead, but the event can't have
-                # happened after it arrived.
-                "time": min(event.time, now).isoformat(),
+                "time": event.time_no_later_than(now).isoformat(),
                 "user": event.user_name,
             }
             if event.type in (BoldEventType.ACTIVATION, BoldEventType.DEACTIVATION):

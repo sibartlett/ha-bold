@@ -352,9 +352,7 @@ class BoldLock(BoldEntity, LockEntity):
 
     def _apply_event(self, event: BoldEvent) -> bool:
         """Apply an event from the event log, returning whether it applied."""
-        # A device's clock can run seconds ahead of Home Assistant's, but an
-        # event can't have happened after it arrived.
-        time = min(event.time, dt_util.utcnow())
+        time = event.time_no_later_than(dt_util.utcnow())
         if event.type == BoldEventType.LOCKED:
             self._update_bolt(event.bolt_locked, time)
             if event.bolt_locked is not None and not self.device.reports_bolt:
