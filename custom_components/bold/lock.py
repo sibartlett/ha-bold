@@ -352,8 +352,11 @@ class BoldLock(BoldEntity, LockEntity):
 
     def _apply_event(self, event: BoldEvent) -> bool:
         """Apply an event from the event log, returning whether it applied."""
+        # A device's clock can run seconds ahead of Home Assistant's, but an
+        # event can't have happened after it arrived.
+        time = min(event.time, dt_util.utcnow())
         if event.type == BoldEventType.LOCKED:
-            self._update_bolt(event.bolt_locked, event.time)
+            self._update_bolt(event.bolt_locked, time)
             if event.bolt_locked is not None and not self.device.reports_bolt:
                 # Locked status was probably just turned on in the Bold app:
                 # check now, rather than at the next device poll.
@@ -367,14 +370,14 @@ class BoldLock(BoldEntity, LockEntity):
             duration = event.activation_time
             if duration is None:
                 duration = self._activation_time
-            until = event.time + duration
+            until = time + duration
             if event.keep_active_until:
                 until = max(until, event.keep_active_until)
             if self._active_until is None or until > self._active_until:
-                self._set_active(event.time, until)
+                self._set_active(time, until)
         elif event.type == BoldEventType.DEACTIVATION:
-            if self._activated_at is None or event.time >= self._activated_at:
-                self._set_inactive(event.time)
+            if self._activated_at is None or time >= self._activated_at:
+                self._set_inactive(time)
         else:
             return False
         if event.user_name:
@@ -403,8 +406,7 @@ class BoldLock(BoldEntity, LockEntity):
         self._schedule_expiry()
 
     def _set_inactive(self, at: datetime) -> None:
-        # A lock's clock can run ahead, putting its deactivation in the future.
-        self._active_until = min(at, dt_util.utcnow())
+        self._active_until = at
         self._cancel_expiry()
 
     def _schedule_expiry(self) -> None:

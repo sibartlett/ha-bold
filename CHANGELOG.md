@@ -12,6 +12,8 @@
 - Entities for features turned on in the Bold app, such as a Connect's
   Controller setting or a lock's event log, appear without reloading the
   integration.
+- A lock whose clock runs ahead of Home Assistant's no longer shows as
+  unlocked for longer than an activation lasts.
 
 ## 1.0.2 (2026-09-28)
 
