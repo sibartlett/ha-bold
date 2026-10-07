@@ -44,6 +44,11 @@ DOOR_CONNECT = {
         "controller": True,
     },
 }
+# The same, when Bold doesn't allow it to be activated remotely.
+NO_REMOTE_ACCESS = {
+    **DOOR_CONNECT,
+    "features": {**DOOR_CONNECT["features"], "remoteAccess": False},
+}
 # A Connect that doesn't, as Bold reports one without its Controller setting.
 PLAIN_CONNECT = {
     **GATEWAY,
@@ -224,20 +229,44 @@ async def test_activation_reported_by_device(
     assert hass.states.get(CONNECT_LOCK).state == LockState.UNLOCKED
 
 
-async def test_unavailable_without_remote_access(
+async def test_remote_access_lost(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     mock_api: AiohttpClientMocker,
     frozen_time: FrozenDateTimeFactory,
 ) -> None:
-    """Test the lock is unavailable when Bold stops allowing remote access."""
-    connect = {**DOOR_CONNECT, "features": {**DOOR_CONNECT["features"]}}
-    connect["features"]["remoteAccess"] = False
+    """Test losing remote access makes the lock unavailable, but not the activity."""
     mock_api.clear_requests()
-    mock_api.get(f"{API_URL}/v2/devices", json=[LOCK, connect])
+    mock_api.get(f"{API_URL}/v2/devices", json=[LOCK, NO_REMOTE_ACCESS])
     mock_api.get(f"{API_URL}/v2/events", json=[])
     await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
     assert hass.states.get(CONNECT_LOCK).state == STATE_UNAVAILABLE
+
+    # Openings by the button or a PIN are still in the Connect's event log.
+    set_events(mock_api, [_activation("2026-09-24T12:10:10+00:00")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(CONNECT_ACTIVITY).attributes[ATTR_EVENT_TYPE] == "activated"
+
+
+async def test_no_remote_access_at_setup(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test a Connect without remote access at setup gets its lock once it has it."""
+    await setup_integration(
+        hass, mock_config_entry, aioclient_mock, [LOCK, NO_REMOTE_ACCESS]
+    )
+    assert hass.states.get(CONNECT_LOCK).state == STATE_UNAVAILABLE
+    assert hass.states.get(CONNECT_ACTIVITY) is not None
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=[LOCK, DOOR_CONNECT])
+    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    assert hass.states.get(CONNECT_LOCK).state == LockState.LOCKED
 
 
 async def test_activity(
@@ -247,16 +276,7 @@ async def test_activity(
     frozen_time: FrozenDateTimeFactory,
 ) -> None:
     """Test activations from elsewhere show on the Connect's lock and activity."""
-    event = event_payload(
-        10,
-        "DeviceActivation",
-        "2026-09-24T12:00:10+00:00",
-        device={"id": GATEWAY_ID, "name": "Bold Connect"},
-        user={"id": 3, "firstName": "Ada", "lastName": "Lovelace"},
-        method="Ble",
-        result="Success",
-    )
-    set_events(mock_api, [event])
+    set_events(mock_api, [_activation("2026-09-24T12:00:10+00:00")])
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
 
     state = hass.states.get(CONNECT_ACTIVITY)
@@ -269,6 +289,19 @@ async def test_activity(
         call[1].query.get("deviceId") == f"{LOCK['id']} {GATEWAY_ID}"
         for call in mock_api.mock_calls
         if "/v2/events" in str(call[1])
+    )
+
+
+def _activation(time: str) -> dict:
+    """Return an activation of the Connect, as Bold's event log has it."""
+    return event_payload(
+        10,
+        "DeviceActivation",
+        time,
+        device={"id": GATEWAY_ID, "name": "Bold Connect"},
+        user={"id": 3, "firstName": "Ada", "lastName": "Lovelace"},
+        method="Ble",
+        result="Success",
     )
 
 

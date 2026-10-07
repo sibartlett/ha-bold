@@ -254,9 +254,10 @@ class BoldDevice:
         """Return whether the device is a Bold Connect that opens a door itself.
 
         A Connect with its relay wired to a door, such as a building's entrance,
-        is activated like a lock, and has its own event log.
+        is activated like a lock, and has its own event log. Without remote
+        access it can't be activated from Home Assistant, but still opens the door.
         """
-        return self.is_gateway and self.activatable and self.remote_access
+        return self.is_gateway and self.activatable
 
     @property
     def has_activity(self) -> bool:
