@@ -29,25 +29,33 @@ def async_add_device_entities(
     async_add_entities: AddConfigEntryEntitiesCallback,
     create_entities: Callable[[BoldDevice], Iterable[Entity]],
 ) -> None:
-    """Add entities for each device, including devices added to Bold later."""
+    """Add entities for each device, including devices added to Bold later.
+
+    A device can gain entities later too, e.g. a Connect with its Controller
+    setting turned on in the Bold app. Entities aren't removed when it loses
+    what they need, keeping their history and whether they're enabled.
+    """
     coordinator = entry.runtime_data.devices
-    known: set[int] = set()
+    # The unique IDs of the entities added for each device.
+    added: dict[int, set[str | None]] = {}
 
     @callback
-    def add_new_devices() -> None:
+    def add_new_entities() -> None:
         # Forget removed devices, so they get entities again if they return.
-        known.intersection_update(coordinator.data)
-        new_devices = [
-            device for device in coordinator.data.values() if device.id not in known
-        ]
-        known.update(device.id for device in new_devices)
-        if entities := [
-            entity for device in new_devices for entity in create_entities(device)
-        ]:
-            async_add_entities(entities)
+        for device_id in added.keys() - coordinator.data.keys():
+            del added[device_id]
+        new_entities: list[Entity] = []
+        for device in coordinator.data.values():
+            unique_ids = added.setdefault(device.id, set())
+            for entity in create_entities(device):
+                if entity.unique_id not in unique_ids:
+                    unique_ids.add(entity.unique_id)
+                    new_entities.append(entity)
+        if new_entities:
+            async_add_entities(new_entities)
 
-    add_new_devices()
-    entry.async_on_unload(coordinator.async_add_listener(add_new_devices))
+    add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(add_new_entities))
 
 
 def device_info(device: BoldDevice, via_device_id: str | None = None) -> DeviceInfo:

@@ -149,11 +149,12 @@ template:
               entity_id: button.garage_activate
 ```
 
-After turning **Controller** on, reload the integration for the lock and
-button to appear.
+The lock and button appear within 10 minutes of turning **Controller** on,
+and become unavailable when it's turned off.
 
 Locks and Bold Connects added to your Bold account appear automatically, and
-ones removed from it are removed from Home Assistant.
+ones removed from it are removed from Home Assistant. Entities for features
+turned on later, such as a lock's event log, appear within 10 minutes too.
 
 To see whether a lock is locked, a Bold Elite or an upgraded Bold Classic is required, with **locked status** turned on in the Bold app. Then set
 or turn the lock once: until then Bold doesn't know its position. Home

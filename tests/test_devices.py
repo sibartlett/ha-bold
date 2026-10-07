@@ -89,6 +89,32 @@ async def test_lock_added(
     assert state.attributes["time"] == "2026-09-24T12:10:20+00:00"
 
 
+async def test_lock_gains_entities(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test a lock gets entities for what it gains, without a reload, once."""
+    without_log = copy.deepcopy(LOCK)
+    without_log["features"]["eventLog"] = False
+    _mock_api(aioclient_mock, [without_log, GATEWAY], [])
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("event.front_door_activity") is None
+
+    _mock_api(aioclient_mock, [LOCK, GATEWAY], [])
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    assert hass.states.get("event.front_door_activity") is not None
+
+    # Later updates don't add them again: Home Assistant would log a clash.
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    assert "already exists" not in caplog.text
+
+
 async def test_lock_removed(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
