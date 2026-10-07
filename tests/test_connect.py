@@ -36,20 +36,32 @@ async def test_connect_device(
     state = hass.states.get("binary_sensor.bold_connect_connectivity")
     assert state.state == STATE_ON
     assert state.attributes["device_class"] == "connectivity"
-    assert (
-        hass.states.get("sensor.bold_connect_last_seen").state
-        == "2026-09-24T11:55:00+00:00"
-    )
+    # Last seen changes at almost every update: it's there to enable.
+    last_seen = entity_registry.async_get("sensor.bold_connect_last_seen")
+    assert last_seen.disabled_by is er.RegistryEntryDisabler.INTEGRATION
 
     # Connects only get connectivity and firmware entities.
     assert sorted(
         entry.entity_id
-        for entry in er.async_entries_for_device(entity_registry, connect.id)
+        for entry in er.async_entries_for_device(
+            entity_registry, connect.id, include_disabled_entities=True
+        )
     ) == [
         "binary_sensor.bold_connect_connectivity",
         "sensor.bold_connect_last_seen",
         "update.bold_connect_firmware",
     ]
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_connect_last_seen(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Test the Connect's last seen time, once enabled."""
+    assert (
+        hass.states.get("sensor.bold_connect_last_seen").state
+        == "2026-09-24T11:55:00+00:00"
+    )
 
 
 async def test_connect_offline(

@@ -131,10 +131,15 @@ class BoldConnectSignalStrengthSensor(BoldEntity, SensorEntity):
 
 
 class BoldLastSeenSensor(BoldEntity, SensorEntity):
-    """When Bold last heard from a Bold Connect."""
+    """When Bold last heard from a Bold Connect.
+
+    It changes at almost every device update, so it's disabled by default: the
+    connectivity sensor says whether the Connect is online.
+    """
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
     _attr_translation_key = "last_seen"
 
     @property

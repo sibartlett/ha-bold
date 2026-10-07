@@ -6,6 +6,9 @@
   garage door through its relay, gets a lock and an Activate button, both
   disabled by default for you to choose, and an activity entity for who
   opened it.
+- A Bold Connect's last seen sensor is disabled by default for new installs,
+  as it changes at almost every update; its connectivity sensor says whether
+  it's online. Existing ones stay enabled, and can be disabled.
 
 ## 1.0.2 (2026-09-28)
 
