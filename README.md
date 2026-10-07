@@ -117,8 +117,9 @@ the lock only shows as unlocked briefly, if at all. The Connect's
 `event.<connect>_activity` is enabled, and is the reliable record of who
 opened it and how.
 
-Voice assistants treat locks and buttons differently. Google Assistant asks
-for a PIN to unlock a lock, but runs a button like a scene, without one.
+Voice assistants treat locks and buttons differently. Google Assistant only
+unlocks a lock with the secure devices PIN set in Home Assistant, but runs a
+button like a scene, without one.
 Neither is exposed to voice assistants unless you choose to; think twice
 before exposing the button.
 

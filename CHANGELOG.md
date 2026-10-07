@@ -1,20 +1,38 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 (2026-10-07)
 
-- A Bold Connect with its Controller setting on, opening a door, gate or
-  garage door through its relay, gets a lock and an Activate button, both
-  disabled by default for you to choose, and an activity entity for who
-  opened it.
+### Bold Connect with Controller on
+
+- A Bold Connect with its **Controller** setting on opens whatever its relay is
+  wired to: a door strike, a gate or a garage door. Bold doesn't say which, so
+  it gets both a lock and an **Activate** button, disabled by default: enable
+  the one that fits, as the README describes. The lock suits a door strike,
+  and Google Assistant only unlocks it with a PIN; the button suits a gate or
+  garage door, or a relay set to pulse.
+- An activity entity for the Connect, enabled, shows who opened it and how,
+  whether from Home Assistant, the Bold app or the Connect's own button.
+- The lock and button are unavailable while Controller is off, or while Bold
+  doesn't allow remote access.
+
+### Changes
+
+- Entities for features turned on in the Bold app, such as a Connect's
+  Controller setting or a lock's event log, appear within 10 minutes, without
+  reloading the integration.
 - A Bold Connect's last seen sensor is disabled by default for new installs,
   as it changes at almost every update; its connectivity sensor says whether
   it's online. Existing ones stay enabled, and can be disabled.
-- Entities for features turned on in the Bold app, such as a Connect's
-  Controller setting or a lock's event log, appear without reloading the
-  integration.
+
+### Fixes
+
 - A lock whose clock runs ahead of Home Assistant's no longer shows as
-  unlocked for longer than an activation lasts, and its activity's time is
-  no longer in the future.
+  unlocked for longer than an activation lasts, or stays unlocking after an
+  activation is ended early.
+- An activity's time is never in the future, even from a device whose clock
+  runs ahead.
+- Errors Bold reports with HTTP 400, such as a Bold Connect needing a firmware
+  update to end an activation early, show Bold's reason instead of "HTTP 400".
 
 ## 1.0.2 (2026-09-28)
 
