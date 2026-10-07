@@ -45,8 +45,15 @@ class BoldActivateButton(BoldEntity, ButtonEntity):
 
     @property
     def available(self) -> bool:
-        """Return whether Bold allows the Connect to be activated remotely."""
-        return super().available and self.device.remote_access
+        """Return whether the Connect opens something, and can be activated remotely.
+
+        Its Controller setting can be turned off after the button was added.
+        """
+        return (
+            super().available
+            and self.device.is_door_connect
+            and self.device.remote_access
+        )
 
     async def async_press(self) -> None:
         """Activate the Connect."""

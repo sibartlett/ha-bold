@@ -151,6 +151,8 @@ class BoldLock(BoldEntity, LockEntity):
             self.coordinator.last_update_success
             and self.device.gateway_id is not None
             and self.device.remote_access
+            # A Connect with its Controller setting turned off opens nothing.
+            and (self.device.is_lock or self.device.is_door_connect)
         )
 
     @property

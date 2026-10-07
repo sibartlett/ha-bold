@@ -328,6 +328,23 @@ async def test_remote_access_lost(
     assert hass.states.get(CONNECT_ACTIVITY).attributes[ATTR_EVENT_TYPE] == "activated"
 
 
+async def test_controller_turned_off(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test the lock and button can't be used once the Connect opens nothing."""
+    mock_api.clear_requests()
+    mock_api.get(f"{API_URL}/v2/devices", json=[LOCK, PLAIN_CONNECT])
+    mock_api.get(f"{API_URL}/v2/events", json=[])
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    assert hass.states.get(CONNECT_LOCK).state == STATE_UNAVAILABLE
+    assert hass.states.get(CONNECT_BUTTON).state == STATE_UNAVAILABLE
+    # The cylinder it serves is unaffected.
+    assert hass.states.get("lock.front_door").state == LockState.LOCKED
+
+
 async def test_no_remote_access_at_setup(
     hass: HomeAssistant,
     setup_credentials: None,
