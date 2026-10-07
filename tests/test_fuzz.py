@@ -80,6 +80,7 @@ KEYS = [
     "lockedStatus",
     "locked",
     "lastLocked",
+    "activatable",
     "remoteAccess",
     "eventLog",
     "rssi",
@@ -146,6 +147,8 @@ def test_device_from_any_payload(payload: dict[str, Any]) -> None:
         assert isinstance(device.id, int)
         assert isinstance(device.name, str)
         assert isinstance(device.update_available, bool)
+        assert isinstance(device.is_door_connect, bool)
+        assert isinstance(device.has_activity, bool)
         assert device.gateway_id is None or isinstance(device.gateway_id, int)
 
 
