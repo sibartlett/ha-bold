@@ -414,7 +414,8 @@ class BoldLock(BoldEntity, LockEntity):
         self._schedule_expiry()
 
     def _set_inactive(self, at: datetime) -> None:
-        self._active_until = at
+        # A lock's clock can run ahead, putting its deactivation in the future.
+        self._active_until = min(at, dt_util.utcnow())
         self._cancel_expiry()
 
     def _schedule_expiry(self) -> None:
