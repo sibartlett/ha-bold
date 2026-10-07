@@ -13,7 +13,11 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL
-from custom_components.bold.const import DEVICE_SCAN_INTERVAL, EVENT_SCAN_INTERVAL
+from custom_components.bold.const import (
+    DEFAULT_ACTIVATION_TIME,
+    DEVICE_SCAN_INTERVAL,
+    EVENT_SCAN_INTERVAL,
+)
 
 from .conftest import (
     GATEWAY,
@@ -35,6 +39,17 @@ DOOR_CONNECT = {
     "settings": {"activationTime": 30, "controllerFunctionality": True},
     "features": {
         "activatable": True,
+        "remoteAccess": True,
+        "eventLog": True,
+        "controller": True,
+    },
+}
+# A Connect that doesn't, as Bold reports one without its Controller setting.
+PLAIN_CONNECT = {
+    **GATEWAY,
+    "settings": {"activationTime": 5, "controllerFunctionality": False},
+    "features": {
+        "activatable": False,
         "remoteAccess": True,
         "eventLog": True,
         "controller": True,
@@ -121,6 +136,32 @@ async def test_lock_when_not_activated_is_noop(
     assert count_calls(mock_api, "remote-deactivation") == 0
 
 
+async def test_unlock_without_activation_time(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test the default activation time applies when Bold gives none."""
+    aioclient_mock.post(
+        f"{API_URL}/v1/devices/{GATEWAY_ID}/remote-activation",
+        json={"deviceId": GATEWAY_ID, "errorCode": "OK"},
+    )
+    await setup_integration(
+        hass,
+        mock_config_entry,
+        aioclient_mock,
+        [LOCK, {**DOOR_CONNECT, "settings": {"controllerFunctionality": True}}],
+    )
+
+    await call_lock(hass, SERVICE_UNLOCK, CONNECT_LOCK)
+    assert hass.states.get(CONNECT_LOCK).state == LockState.UNLOCKED
+
+    await advance(hass, frozen_time, DEFAULT_ACTIVATION_TIME)
+    assert hass.states.get(CONNECT_LOCK).state == LockState.LOCKED
+
+
 async def test_unlock_error(
     hass: HomeAssistant,
     setup_credentials: None,
@@ -139,6 +180,48 @@ async def test_unlock_error(
     with pytest.raises(HomeAssistantError):
         await call_lock(hass, SERVICE_UNLOCK, CONNECT_LOCK)
     assert hass.states.get(CONNECT_LOCK).state == LockState.LOCKED
+
+
+async def test_lock_error(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test a failure to end an activation is raised, leaving it unlocked."""
+    aioclient_mock.post(
+        f"{API_URL}/v1/devices/{GATEWAY_ID}/remote-activation",
+        json={"deviceId": GATEWAY_ID, "errorCode": "OK", "activationTime": 30},
+    )
+    aioclient_mock.post(
+        f"{API_URL}/v1/devices/{GATEWAY_ID}/remote-deactivation",
+        json={"deviceId": GATEWAY_ID, "errorCode": "GatewayNotFound"},
+    )
+    await setup_integration(
+        hass, mock_config_entry, aioclient_mock, [LOCK, DOOR_CONNECT]
+    )
+    await call_lock(hass, SERVICE_UNLOCK, CONNECT_LOCK)
+
+    with pytest.raises(HomeAssistantError):
+        await call_lock(hass, SERVICE_LOCK, CONNECT_LOCK)
+    assert hass.states.get(CONNECT_LOCK).state == LockState.UNLOCKED
+
+
+async def test_activation_reported_by_device(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test an activation in Bold's device data shows on the lock."""
+    mock_api.clear_requests()
+    mock_api.get(
+        f"{API_URL}/v2/devices",
+        json=[LOCK, {**DOOR_CONNECT, "isActiveUntil": "2026-09-24T13:00:00Z"}],
+    )
+    mock_api.get(f"{API_URL}/v2/events", json=[])
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    assert hass.states.get(CONNECT_LOCK).state == LockState.UNLOCKED
 
 
 async def test_unavailable_without_remote_access(
@@ -163,7 +246,7 @@ async def test_activity(
     mock_api: AiohttpClientMocker,
     frozen_time: FrozenDateTimeFactory,
 ) -> None:
-    """Test the Connect's activations are in its own activity entity."""
+    """Test activations from elsewhere show on the Connect's lock and activity."""
     event = event_payload(
         10,
         "DeviceActivation",
@@ -179,6 +262,9 @@ async def test_activity(
     state = hass.states.get(CONNECT_ACTIVITY)
     assert state.attributes[ATTR_EVENT_TYPE] == "activated"
     assert state.attributes["user"] == "Ada Lovelace"
+    lock = hass.states.get(CONNECT_LOCK)
+    assert lock.state == LockState.UNLOCKED
+    assert lock.attributes["changed_by"] == "Ada Lovelace"
     assert any(
         call[1].query.get("deviceId") == f"{LOCK['id']} {GATEWAY_ID}"
         for call in mock_api.mock_calls
@@ -193,6 +279,8 @@ async def test_plain_connect_is_not_a_lock(
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
     """Test a Connect that doesn't open a door gets no lock or activity."""
-    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, GATEWAY])
+    await setup_integration(
+        hass, mock_config_entry, aioclient_mock, [LOCK, PLAIN_CONNECT]
+    )
     assert hass.states.get(CONNECT_LOCK) is None
     assert hass.states.get(CONNECT_ACTIVITY) is None
