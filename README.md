@@ -96,7 +96,7 @@ Each Bold Connect is a device too, and the locks it serves are linked to it:
 | Entity | What it does |
 |---|---|
 | `binary_sensor.<connect>_connectivity` | Online while Bold has heard from the Connect in the last 30 minutes. |
-| `sensor.<connect>_last_seen` | When Bold last heard from the Connect. |
+| `sensor.<connect>_last_seen` | When Bold last heard from the Connect. Disabled by default, as it changes at almost every update. |
 | `update.<connect>_firmware` | Whether the Connect is on the firmware version Bold requires. |
 
 ### A Bold Connect with its Controller setting on
