@@ -9,6 +9,9 @@
 - A Bold Connect's last seen sensor is disabled by default for new installs,
   as it changes at almost every update; its connectivity sensor says whether
   it's online. Existing ones stay enabled, and can be disabled.
+- Entities for features turned on in the Bold app, such as a Connect's
+  Controller setting or a lock's event log, appear without reloading the
+  integration.
 
 ## 1.0.2 (2026-09-28)
 

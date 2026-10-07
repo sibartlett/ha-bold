@@ -345,6 +345,29 @@ async def test_controller_turned_off(
     assert hass.states.get("lock.front_door").state == LockState.LOCKED
 
 
+async def test_controller_turned_on(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test turning Controller on adds the Connect's entities without a reload."""
+    await setup_integration(
+        hass, mock_config_entry, aioclient_mock, [LOCK, PLAIN_CONNECT]
+    )
+    assert hass.states.get(CONNECT_LOCK) is None
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{API_URL}/v2/devices", json=[LOCK, DOOR_CONNECT])
+    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
+    await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
+    assert hass.states.get(CONNECT_LOCK).state == LockState.LOCKED
+    assert hass.states.get(CONNECT_BUTTON) is not None
+    assert hass.states.get(CONNECT_ACTIVITY) is not None
+    assert GATEWAY_ID in mock_config_entry.runtime_data.events.device_ids
+
+
 async def test_no_remote_access_at_setup(
     hass: HomeAssistant,
     setup_credentials: None,
