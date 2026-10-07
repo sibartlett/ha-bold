@@ -117,7 +117,7 @@
       "message": "The Bold lock command failed: {error}"
     },
     "firmware_outdated": {
-      "message": "Update the lock's firmware in the Bold app to end activations remotely."
+      "message": "Bold needs a firmware update, through the Bold app, before it can end activations remotely."
     },
     "gateway_not_found": {
       "message": "No Bold Connect is available to reach this lock."

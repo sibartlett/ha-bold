@@ -350,13 +350,17 @@ async def test_remote_activation(
         ("SomethingElse", BoldCommandError),
     ],
 )
+# Bold sends some error codes with HTTP 400, e.g. DeviceFirmwareOutdated for a
+# Connect that can't end an activation early.
+@pytest.mark.parametrize("status", [200, 400])
 async def test_command_errors(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, code, error
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, code, error, status
 ) -> None:
     """Test command error codes are translated."""
     aioclient_mock.post(
         f"{API_URL}/v1/devices/{LOCK_ID}/remote-deactivation",
         json={"deviceId": LOCK_ID, "errorCode": code, "errorMessage": "nope"},
+        status=status,
     )
     with pytest.raises(error, match="^nope$") as caught:
         await _client(hass).remote_deactivation(LOCK_ID)
@@ -373,6 +377,19 @@ async def test_command_error_without_message(
         json={"deviceId": LOCK_ID, "errorCode": "SomethingElse"},
     )
     with pytest.raises(BoldCommandError, match="^SomethingElse$"):
+        await _client(hass).remote_deactivation(LOCK_ID)
+
+
+async def test_http_error_without_json(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test an error response that isn't JSON is described by its status."""
+    aioclient_mock.post(
+        f"{API_URL}/v1/devices/{LOCK_ID}/remote-deactivation",
+        status=400,
+        text="<html>Bad Request</html>",
+    )
+    with pytest.raises(BoldError, match="HTTP 400$"):
         await _client(hass).remote_deactivation(LOCK_ID)
 
 

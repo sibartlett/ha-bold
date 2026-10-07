@@ -91,7 +91,7 @@ async def test_lock_when_not_activated_is_noop(
     [
         ("gatewayNotFoundError", "No Bold Connect"),
         ("TooManyRequests", "Too many requests"),
-        ("DeviceFirmwareOutdated", "Update the lock's firmware"),
+        ("DeviceFirmwareOutdated", "Bold needs a firmware update"),
         ("Unknown", "command failed"),
     ],
 )

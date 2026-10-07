@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import Any
 
-from aiohttp import ClientError, ClientResponseError, ClientSession
+from aiohttp import ClientError, ClientResponse, ClientResponseError, ClientSession
 
 from .const import API_URL
 from .exceptions import (
@@ -76,14 +76,8 @@ class BoldClient:
                 json=json,
                 headers={"Authorization": f"Bearer {token}"},
             ) as response:
-                if response.status == HTTPStatus.UNAUTHORIZED:
-                    raise BoldAuthError("Access token rejected")
-                if response.status == HTTPStatus.FORBIDDEN:
-                    raise BoldForbiddenError(f"{method} {path} is not allowed")
-                if response.status == HTTPStatus.TOO_MANY_REQUESTS:
-                    raise BoldRateLimitError("Too many requests")
                 if response.status >= HTTPStatus.BAD_REQUEST:
-                    raise BoldError(f"{method} {path} failed: HTTP {response.status}")
+                    raise await _response_error(response, f"{method} {path}")
                 return await response.json(content_type=None)
         except ClientError as err:
             raise BoldConnectionError(f"{method} {path} failed: {err}") from err
@@ -254,13 +248,36 @@ class BoldClient:
         if not isinstance(response, dict):
             raise BoldError(f"Unexpected response from {command}")
         code = response.get("errorCode")
-        message = response.get("errorMessage")
         if code in (None, "OK"):
             return response
-        if code == "TooManyRequests":
-            raise BoldRateLimitError(message or code)
-        if code == "gatewayNotFoundError":
-            raise BoldGatewayNotFoundError(code, message)
-        if code == "DeviceFirmwareOutdated":
-            raise BoldFirmwareOutdatedError(code, message)
-        raise BoldCommandError(code, message)
+        raise _command_error(code, response.get("errorMessage"))
+
+
+async def _response_error(response: ClientResponse, request: str) -> BoldError:
+    """Return the error for a failed request."""
+    if response.status == HTTPStatus.UNAUTHORIZED:
+        return BoldAuthError("Access token rejected")
+    if response.status == HTTPStatus.FORBIDDEN:
+        return BoldForbiddenError(f"{request} is not allowed")
+    if response.status == HTTPStatus.TOO_MANY_REQUESTS:
+        return BoldRateLimitError("Too many requests")
+    # Bold explains some failures, e.g. a command the device's firmware doesn't
+    # support, with an error code.
+    try:
+        body = await response.json(content_type=None)
+    except ValueError:
+        body = None
+    if isinstance(body, dict) and isinstance(code := body.get("errorCode"), str):
+        return _command_error(code, body.get("errorMessage"))
+    return BoldError(f"{request} failed: HTTP {response.status}")
+
+
+def _command_error(code: str, message: str | None) -> BoldError:
+    """Return the error for an error code from Bold."""
+    if code == "TooManyRequests":
+        return BoldRateLimitError(message or code)
+    if code == "gatewayNotFoundError":
+        return BoldGatewayNotFoundError(code, message)
+    if code == "DeviceFirmwareOutdated":
+        return BoldFirmwareOutdatedError(code, message)
+    return BoldCommandError(code, message)
