@@ -4,6 +4,7 @@ from homeassistant.components.event import EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .boldsmartlock import BoldDevice, BoldEvent, BoldEventType
 from .coordinator import BoldConfigEntry, BoldEventCoordinator
@@ -78,13 +79,14 @@ class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Fire an event for each new event of this device."""
+        now = dt_util.utcnow()
         for event in self.coordinator.data or []:
             if event.device_id != self.device_id or not (
                 event_type := _event_type(event)
             ):
                 continue
             attributes: dict[str, str | int | bool | None] = {
-                "time": event.time.isoformat(),
+                "time": event.time_no_later_than(now).isoformat(),
                 "user": event.user_name,
             }
             if event.type in (BoldEventType.ACTIVATION, BoldEventType.DEACTIVATION):

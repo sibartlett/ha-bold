@@ -80,6 +80,22 @@ async def test_activation_event(
     assert hass.states.get(ENTITY_ID).state == "2026-09-24T12:00:30.000+00:00"
 
 
+async def test_event_from_a_clock_ahead(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test an event timed after now, by a lock's clock, happened when it arrived."""
+    set_events(
+        mock_api,
+        [event_payload(10, "DeviceActivation", "2026-09-24T12:00:35+00:00")],
+    )
+    # Polled at 12:00:30.
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(ENTITY_ID).attributes["time"] == "2026-09-24T12:00:30+00:00"
+
+
 @pytest.mark.parametrize(
     ("event", "event_type", "attributes"),
     [

@@ -283,6 +283,32 @@ async def test_older_deactivation_after_unlock(
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
 
+async def test_activation_from_a_clock_ahead(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test an activation timed after now, by a lock's clock, starts now."""
+    # Polled at 12:00:30, but the lock's clock says 12:00:35.
+    set_events(
+        mock_api,
+        [
+            event_payload(
+                99,
+                "DeviceActivation",
+                "2026-09-24T12:00:35+00:00",
+                result="Success",
+                activationTime=15,
+            )
+        ],
+    )
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+    await advance(hass, frozen_time, timedelta(seconds=15))
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+
+
 async def test_deactivation_from_a_clock_ahead(
     hass: HomeAssistant,
     setup_credentials: None,

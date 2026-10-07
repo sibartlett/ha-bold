@@ -137,6 +137,9 @@ def test_event_from_any_payload(payload: dict[str, Any]) -> None:
         # Keys and ordering work on whatever was parsed.
         assert event.key == event.key
         assert event.sort_key <= event.sort_key
+        # So does comparing its time with when it arrived.
+        now = datetime(2026, 9, 24, 12, tzinfo=UTC)
+        assert event.time_no_later_than(now) == min(event.time, now)
 
 
 @given(PAYLOADS)

@@ -162,7 +162,8 @@ Assistant switches over within seconds.
 
 The activity entity's `event_type` is one of `activated`, `activation_failed`,
 `deactivated`, `tamper`, `locked` or `unlocked`. Its attributes say when it
-happened (`time`) and who did it (`user`, when Bold knows); activations and
+happened (`time`, by the device's clock, but never later than it reached Home
+Assistant) and who did it (`user`, when Bold knows); activations and
 deactivations add the `method` (e.g. `Pin`, `Button`, `Ble`) and whether it
 was `remote`, activations their `result`, and tamper alerts the `tamper_type`
 (`vibration`, `rotations` or `faulty_pin`).

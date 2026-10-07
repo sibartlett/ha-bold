@@ -154,6 +154,22 @@ def test_event_fields_by_type() -> None:
     assert other.voltage_idle is None
 
 
+def test_event_time_no_later_than() -> None:
+    """Test an event's time is taken as no later than when it arrived."""
+    event = BoldEvent.from_api(
+        {"type": "DeviceActivation", "time": "2026-09-24T12:00:10Z"}
+    )
+    assert event is not None
+    logged = datetime(2026, 9, 24, 12, 0, 10, tzinfo=UTC)
+    # Arriving after it was logged, as usual.
+    later = logged + timedelta(seconds=4)
+    assert event.time_no_later_than(later) == logged
+    # Logged by a clock running ahead.
+    earlier = logged - timedelta(seconds=3)
+    assert event.time_no_later_than(earlier) == earlier
+    assert event.time == logged
+
+
 def test_device_from_api_malformed() -> None:
     """Test devices without an ID are skipped, and badly typed fields ignored."""
     assert BoldDevice.from_api({}) is None
