@@ -1,13 +1,15 @@
-"""Tests for a Bold Connect that opens a door itself."""
+"""Tests for a Bold Connect that opens something itself: a door, gate or garage."""
 
 from datetime import timedelta
 
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
 from homeassistant.components.event import ATTR_EVENT_TYPE
 from homeassistant.components.lock import SERVICE_LOCK, SERVICE_UNLOCK, LockState
-from homeassistant.const import ATTR_ASSUMED_STATE, STATE_UNAVAILABLE
+from homeassistant.const import ATTR_ASSUMED_STATE, ATTR_ENTITY_ID, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -60,14 +62,24 @@ PLAIN_CONNECT = {
         "controller": True,
     },
 }
+# The same, set to pulse its relay rather than hold it for an activation time.
+PULSE = {**DOOR_CONNECT, "settings": {**DOOR_CONNECT["settings"], "activationTime": 0}}
 CONNECT_LOCK = "lock.bold_connect"
+CONNECT_BUTTON = "button.bold_connect_activate"
 CONNECT_ACTIVITY = "event.bold_connect_activity"
+
+
+@pytest.fixture(autouse=True)
+def enable_entities(request: pytest.FixtureRequest) -> None:
+    """Enable the Connect's lock and button, unless testing they're disabled."""
+    if request.node.name != "test_disabled_by_default":
+        request.getfixturevalue("entity_registry_enabled_by_default")
 
 
 @pytest.fixture
 def platforms() -> list[str]:
-    """Only set up locks and events."""
-    return ["event", "lock"]
+    """Only set up buttons, locks and events."""
+    return ["button", "event", "lock"]
 
 
 @pytest.fixture
@@ -99,6 +111,73 @@ async def test_door_connect_is_a_lock(
     assert state.attributes[ATTR_ASSUMED_STATE] is True
     # The lock it serves is unaffected.
     assert hass.states.get("lock.front_door").state == LockState.LOCKED
+
+
+async def test_disabled_by_default(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test the lock and button wait to be chosen, but the activity doesn't."""
+    for entity_id in (CONNECT_LOCK, CONNECT_BUTTON):
+        entry = entity_registry.async_get(entity_id)
+        assert entry is not None
+        assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert hass.states.get(CONNECT_ACTIVITY) is not None
+    # The cylinder's lock is still enabled.
+    assert hass.states.get("lock.front_door") is not None
+
+
+async def test_button_activates(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+) -> None:
+    """Test pressing the button activates the Connect."""
+    await _press(hass)
+    assert count_calls(mock_api, f"/v1/devices/{GATEWAY_ID}/remote-activation") == 1
+
+
+async def test_button_error(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test a command error from the button is raised to the user."""
+    aioclient_mock.post(
+        f"{API_URL}/v1/devices/{GATEWAY_ID}/remote-activation",
+        json={"deviceId": GATEWAY_ID, "errorCode": "GatewayNotFound"},
+    )
+    await setup_integration(
+        hass, mock_config_entry, aioclient_mock, [LOCK, DOOR_CONNECT]
+    )
+    with pytest.raises(HomeAssistantError):
+        await _press(hass)
+
+
+async def test_pulse(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test a Connect set to pulse its relay isn't shown unlocked for a time."""
+    aioclient_mock.post(
+        f"{API_URL}/v1/devices/{GATEWAY_ID}/remote-activation",
+        json={"deviceId": GATEWAY_ID, "errorCode": "OK"},
+    )
+    await setup_integration(hass, mock_config_entry, aioclient_mock, [LOCK, PULSE])
+
+    await call_lock(hass, SERVICE_UNLOCK, CONNECT_LOCK)
+    assert hass.states.get(CONNECT_LOCK).state == LockState.LOCKED
+
+    # Its activations by its button or a PIN don't give a time either.
+    set_events(aioclient_mock, [_activation("2026-09-24T12:00:29+00:00")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(CONNECT_ACTIVITY).attributes[ATTR_EVENT_TYPE] == "activated"
+    assert hass.states.get(CONNECT_LOCK).state == LockState.LOCKED
 
 
 async def test_unlock_until_activation_ends(
@@ -241,6 +320,7 @@ async def test_remote_access_lost(
     mock_api.get(f"{API_URL}/v2/events", json=[])
     await advance(hass, frozen_time, DEVICE_SCAN_INTERVAL)
     assert hass.states.get(CONNECT_LOCK).state == STATE_UNAVAILABLE
+    assert hass.states.get(CONNECT_BUTTON).state == STATE_UNAVAILABLE
 
     # Openings by the button or a PIN are still in the Connect's event log.
     set_events(mock_api, [_activation("2026-09-24T12:10:10+00:00")])
@@ -292,6 +372,13 @@ async def test_activity(
     )
 
 
+async def _press(hass: HomeAssistant) -> None:
+    """Press the Connect's button."""
+    await hass.services.async_call(
+        BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: CONNECT_BUTTON}, blocking=True
+    )
+
+
 def _activation(time: str) -> dict:
     """Return an activation of the Connect, as Bold's event log has it."""
     return event_payload(
@@ -311,9 +398,10 @@ async def test_plain_connect_is_not_a_lock(
     mock_config_entry: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    """Test a Connect that doesn't open a door gets no lock or activity."""
+    """Test a Connect that doesn't open anything gets no lock, button or activity."""
     await setup_integration(
         hass, mock_config_entry, aioclient_mock, [LOCK, PLAIN_CONNECT]
     )
     assert hass.states.get(CONNECT_LOCK) is None
+    assert hass.states.get(CONNECT_BUTTON) is None
     assert hass.states.get(CONNECT_ACTIVITY) is None

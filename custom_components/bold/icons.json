@@ -1,5 +1,10 @@
 {
   "entity": {
+    "button": {
+      "activate": {
+        "default": "mdi:gesture-tap-button"
+      }
+    },
     "event": {
       "activity": {
         "default": "mdi:door",

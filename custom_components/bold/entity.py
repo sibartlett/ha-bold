@@ -3,12 +3,22 @@
 from collections.abc import Callable, Iterable
 
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .boldsmartlock import BoldDevice
+from .boldsmartlock import (
+    BoldAuthError,
+    BoldBluetoothError,
+    BoldBluetoothUnavailableError,
+    BoldDevice,
+    BoldError,
+    BoldFirmwareOutdatedError,
+    BoldGatewayNotFoundError,
+    BoldRateLimitError,
+)
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import BoldConfigEntry, BoldDeviceCoordinator
 
@@ -87,3 +97,26 @@ class BoldEntity(CoordinatorEntity[BoldDeviceCoordinator]):
     def available(self) -> bool:
         """Return whether the device is still known to the account."""
         return super().available and self.device_id in self.coordinator.data
+
+
+def command_error(err: BoldError) -> HomeAssistantError:
+    """Translate an API error from a command to a lock or Bold Connect."""
+    if isinstance(err, BoldBluetoothUnavailableError):
+        key = "bluetooth_unavailable"
+    elif isinstance(err, BoldBluetoothError):
+        key = "bluetooth_failed"
+    elif isinstance(err, BoldRateLimitError):
+        key = "rate_limited"
+    elif isinstance(err, BoldGatewayNotFoundError):
+        key = "gateway_not_found"
+    elif isinstance(err, BoldFirmwareOutdatedError):
+        key = "firmware_outdated"
+    elif isinstance(err, BoldAuthError):
+        key = "auth_failed"
+    else:
+        key = "command_failed"
+    return HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key=key,
+        translation_placeholders={"error": str(err)},
+    )

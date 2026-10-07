@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- A Bold Connect with its relay wired to a door, such as a building's
-  entrance, gets a lock to unlock that door, and an activity entity for who
+- A Bold Connect with its Controller setting on, opening a door, gate or
+  garage door through its relay, gets a lock and an Activate button, both
+  disabled by default for you to choose, and an activity entity for who
   opened it.
 
 ## 1.0.2 (2026-09-28)

@@ -4,7 +4,8 @@ A Bold lock is not motorised: activating it lets someone turn the cylinder by
 hand for a short time.
 
 A Bold Connect with its relay wired to a door is activated the same way, but
-only through Bold's cloud.
+only through Bold's cloud. Its relay may drive a garage door or gate instead,
+so its lock is disabled by default, as is its button.
 
 Upgraded locks report their bolt position: the lock shows that, and shows as
 unlocking while it's activated with the bolt still thrown. Other locks show as
@@ -27,16 +28,11 @@ from homeassistant.util import dt as dt_util
 from .boldsmartlock import (
     COMMAND_ACTIVATE,
     COMMAND_DEACTIVATE,
-    BoldAuthError,
-    BoldBluetoothError,
     BoldBluetoothUnavailableError,
     BoldDevice,
     BoldError,
     BoldEvent,
     BoldEventType,
-    BoldFirmwareOutdatedError,
-    BoldGatewayNotFoundError,
-    BoldRateLimitError,
     async_send_command,
 )
 from .const import (
@@ -47,7 +43,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import BoldConfigEntry, BoldRuntimeData
-from .entity import BoldEntity, async_add_device_entities
+from .entity import BoldEntity, async_add_device_entities, command_error
 from .unlock import ROUTES, Route, UnlockMethod
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,29 +70,6 @@ async def async_setup_entry(
     )
 
 
-def _command_error(err: BoldError) -> HomeAssistantError:
-    """Translate an API error from a lock command."""
-    if isinstance(err, BoldBluetoothUnavailableError):
-        key = "bluetooth_unavailable"
-    elif isinstance(err, BoldBluetoothError):
-        key = "bluetooth_failed"
-    elif isinstance(err, BoldRateLimitError):
-        key = "rate_limited"
-    elif isinstance(err, BoldGatewayNotFoundError):
-        key = "gateway_not_found"
-    elif isinstance(err, BoldFirmwareOutdatedError):
-        key = "firmware_outdated"
-    elif isinstance(err, BoldAuthError):
-        key = "auth_failed"
-    else:
-        key = "command_failed"
-    return HomeAssistantError(
-        translation_domain=DOMAIN,
-        translation_key=key,
-        translation_placeholders={"error": str(err)},
-    )
-
-
 class BoldLock(BoldEntity, LockEntity):
     """A Bold Smart Lock, or a Bold Connect wired to a door."""
 
@@ -105,6 +78,8 @@ class BoldLock(BoldEntity, LockEntity):
     def __init__(self, data: BoldRuntimeData, device: BoldDevice) -> None:
         """Initialize the lock."""
         super().__init__(data.devices, device, None)
+        # Bold doesn't say what a Connect's relay opens: let the user choose.
+        self._attr_entity_registry_enabled_default = not device.is_gateway
         self._data = data
         self._events = data.events
         self._bluetooth_lock = asyncio.Lock()
@@ -223,13 +198,18 @@ class BoldLock(BoldEntity, LockEntity):
 
     @property
     def _activation_time(self) -> timedelta:
-        return self.device.activation_time or DEFAULT_ACTIVATION_TIME
+        # Zero is a Connect set to pulse its relay: no time unlocked.
+        if self.device.activation_time is None:
+            return DEFAULT_ACTIVATION_TIME
+        return self.device.activation_time
 
     async def async_unlock(self, **kwargs: Any) -> None:
         """Activate the lock, so it can be turned by hand."""
         duration = await self._async_send_showing_progress(COMMAND_ACTIVATE)
         now = dt_util.utcnow()
-        self._set_active(now, now + (duration or self._activation_time))
+        if duration is None:
+            duration = self._activation_time
+        self._set_active(now, now + duration)
         self.async_write_ha_state()
 
     async def async_lock(self, **kwargs: Any) -> None:
@@ -295,7 +275,7 @@ class BoldLock(BoldEntity, LockEntity):
                         routes[index + 1],
                     )
         assert error is not None
-        raise _command_error(error) from error
+        raise command_error(error) from error
 
     async def _async_send_connect(self, command_type: str) -> timedelta | None:
         """Send a command through the Bold Connect, via Bold's cloud."""
@@ -382,7 +362,10 @@ class BoldLock(BoldEntity, LockEntity):
                 )
             return True
         if event.type == BoldEventType.ACTIVATION and event.successful:
-            until = event.time + (event.activation_time or self._activation_time)
+            duration = event.activation_time
+            if duration is None:
+                duration = self._activation_time
+            until = event.time + duration
             if event.keep_active_until:
                 until = max(until, event.keep_active_until)
             if self._active_until is None or until > self._active_until:
