@@ -43,7 +43,7 @@
       "step": {
         "user": {
           "title": "Link a door sensor",
-          "description": "A lock can miss being unlocked, and keep showing locked. Linked to its door's contact sensor, it shows as open while the door is, and as unlocked once the door has opened since it last reported locked.",
+          "description": "A lock can miss being unlocked, and keep showing locked. Linked to its door's contact sensor, it shows as unlocked while the door is open, and once the door has opened since it last reported locked.",
           "data": {
             "lock": "Lock",
             "door_sensor": "Door sensor"

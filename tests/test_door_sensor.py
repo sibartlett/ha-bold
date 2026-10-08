@@ -87,14 +87,14 @@ async def _door(hass: HomeAssistant, state: str) -> None:
     await hass.async_block_till_done()
 
 
-async def test_open_then_unlocked(
+async def test_open_door_unlocked(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    """Test an opened door shows the lock open, then unlocked once closed."""
+    """Test an opened door shows the lock unlocked, and still once closed."""
     assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
     await _door(hass, STATE_ON)
-    assert hass.states.get(LOCK_ENTITY).state == LockState.OPEN
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
     # The lock last reported locked at 11:50, before the door opened: it missed
     # being unlocked.
@@ -116,6 +116,21 @@ async def test_locked_after_opening(
     assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
 
+async def test_locked_while_open(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test the bolt thrown with the door open shows unlocked until it closes."""
+    await _door(hass, STATE_ON)
+    set_events(mock_api, [_bolt_event(10, "2026-09-24T12:00:20+00:00", "Locked")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+    await _door(hass, STATE_OFF)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+
+
 async def test_late_report_from_before_opening(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -133,10 +148,10 @@ async def test_late_report_from_before_opening(
 async def test_unlocking_with_the_door_open(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    """Test an activation with the door open still shows the door open."""
+    """Test an activation with the door open shows unlocked, not locking."""
     await _door(hass, STATE_ON)
     await call_lock(hass, SERVICE_UNLOCK)
-    assert hass.states.get(LOCK_ENTITY).state == LockState.OPEN
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
 
 async def test_sensor_unavailable(
@@ -151,7 +166,7 @@ async def test_sensor_unavailable(
 
     # Back, and open: the door opened while it was away.
     await _door(hass, STATE_ON)
-    assert hass.states.get(LOCK_ENTITY).state == LockState.OPEN
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
 
 async def test_opening_remembered(
@@ -194,12 +209,12 @@ async def test_open_at_startup(
     mock_config_entry: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    """Test a door already open at startup shows the lock open."""
+    """Test a door already open at startup shows the lock unlocked."""
     hass.states.async_set(DOOR, STATE_ON)
     await setup_integration(
         hass, mock_config_entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY]
     )
-    assert hass.states.get(LOCK_ENTITY).state == LockState.OPEN
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
 
 async def test_link_reconfigure_and_unlink(
@@ -232,7 +247,7 @@ async def test_link_reconfigure_and_unlink(
     # Reloaded with the link.
     assert entry.runtime_data.door_sensors == {LOCK_ID: DOOR}
     await _door(hass, STATE_ON)
-    assert hass.states.get(LOCK_ENTITY).state == LockState.OPEN
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
     await _door(hass, STATE_OFF)
 
     # Every lock is linked now.
