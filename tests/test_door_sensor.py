@@ -31,6 +31,7 @@ from custom_components.bold.const import (
 
 from .conftest import (
     GATEWAY,
+    LOCK,
     LOCK_ENTITY,
     LOCK_ID,
     advance,
@@ -279,6 +280,26 @@ async def test_link_reconfigure_and_unlink(
     await hass.async_block_till_done()
     assert entry.runtime_data.door_sensors == {}
     assert entry.state is ConfigEntryState.LOADED
+
+
+async def test_lock_without_locked_status_not_offered(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test only locks reporting their bolt can be linked to a door sensor."""
+    entry = MockConfigEntry(
+        domain=mock_config_entry.domain,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
+    )
+    await setup_integration(hass, entry, aioclient_mock, [LOCK, GATEWAY])
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_DOOR_SENSOR), context={"source": SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "no_locks"
 
 
 async def test_entry_update_without_reload(

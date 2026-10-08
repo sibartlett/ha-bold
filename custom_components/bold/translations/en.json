@@ -49,7 +49,7 @@
             "door_sensor": "Door sensor"
           },
           "data_description": {
-            "door_sensor": "A door, garage door or opening sensor that's on while the door is open."
+            "door_sensor": "A door or opening sensor that's on while the door is open."
           }
         },
         "reconfigure": {
@@ -58,13 +58,13 @@
             "door_sensor": "Door sensor"
           },
           "data_description": {
-            "door_sensor": "A door, garage door or opening sensor that's on while the door is open."
+            "door_sensor": "A door or opening sensor that's on while the door is open."
           }
         }
       },
       "abort": {
         "not_loaded": "Bold isn't set up at the moment. Try again once it's loaded.",
-        "no_locks": "Every Bold lock is already linked to a door sensor.",
+        "no_locks": "There are no Bold locks with locked status left to link.",
         "reconfigure_successful": "Reconfiguration was successful"
       }
     }

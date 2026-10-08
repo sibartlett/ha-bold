@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- A lock can be linked to its door's contact sensor, from the integration's
-  page. It then shows as unlocked while the door is open, and once the door
+- A lock with locked status on can be linked to its door's contact sensor,
+  from the integration's page. It then shows as unlocked while the door is open, and once the door
   has opened since it last reported locked, catching unlocks the lock
   missed.
 

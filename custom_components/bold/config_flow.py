@@ -39,7 +39,6 @@ DOOR_SENSOR_SELECTOR = EntitySelector(
         domain="binary_sensor",
         device_class=[
             BinarySensorDeviceClass.DOOR,
-            BinarySensorDeviceClass.GARAGE_DOOR,
             BinarySensorDeviceClass.OPENING,
         ],
     )
@@ -171,8 +170,8 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
         locks = {
             str(device.id): device.name
             for device in entry.runtime_data.devices.data.values()
-            if (device.is_lock or device.is_door_connect)
-            and str(device.id) not in linked
+            # Only a lock reporting its bolt has a status a door can correct.
+            if device.is_lock and device.reports_bolt and str(device.id) not in linked
         }
         if not locks:
             return self.async_abort(reason="no_locks")
