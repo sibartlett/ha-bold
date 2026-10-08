@@ -180,7 +180,11 @@ async def test_opening_remembered(
     data = await async_mock_restore_state_shutdown_restart(hass)
     extra = data.last_states[LOCK_ENTITY].extra_data
     assert extra is not None
-    assert extra.as_dict() == {"door_opened_at": "2026-09-24T12:00:00+00:00"}
+    assert extra.as_dict() == {
+        "door_opened_at": "2026-09-24T12:00:00+00:00",
+        "door_open": False,
+        "door_seen_at": "2026-09-24T12:00:00+00:00",
+    }
 
 
 async def test_opening_restored(
@@ -203,6 +207,82 @@ async def test_opening_restored(
         hass, mock_config_entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY]
     )
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+async def _restart_with(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    stored: dict,
+    door: str,
+) -> None:
+    """Set up as after a restart, with what the lock stored and the door now."""
+    mock_restore_cache_with_extra_data(
+        hass, [(State(LOCK_ENTITY, LockState.LOCKED), stored)]
+    )
+    hass.states.async_set(DOOR, door)
+    await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
+
+
+async def test_restart_with_the_door_still_open(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test a door open before and after a restart hasn't opened again."""
+    # Opened at 11:45, then locked at 11:50 with the door still open.
+    await _restart_with(
+        hass,
+        mock_config_entry,
+        aioclient_mock,
+        {
+            "door_opened_at": "2026-09-24T11:45:00+00:00",
+            "door_open": True,
+            "door_seen_at": "2026-09-24T11:58:00+00:00",
+        },
+        STATE_ON,
+    )
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+
+
+async def test_opened_while_restarting(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test a door closed before a restart and open after it has opened."""
+    await _restart_with(
+        hass,
+        mock_config_entry,
+        aioclient_mock,
+        {
+            "door_opened_at": "2026-09-24T11:40:00+00:00",
+            "door_open": False,
+            "door_seen_at": "2026-09-24T11:58:00+00:00",
+        },
+        STATE_ON,
+    )
+    # Opened after 11:58, when last seen closed: after the 11:50 locked report.
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+async def test_sensor_back_with_the_door_still_open(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test a sensor coming back with the door still open isn't an opening."""
+    await _door(hass, STATE_ON)
+    set_events(mock_api, [_bolt_event(10, "2026-09-24T12:00:20+00:00", "Locked")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+
+    await _door(hass, STATE_UNAVAILABLE)
+    await _door(hass, STATE_ON)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
 
 async def test_open_at_startup(
