@@ -91,6 +91,21 @@ Each lock gets:
 | `update.<lock>_firmware` | Whether the lock is on the firmware version Bold requires. |
 | `select.<lock>_unlock_method` | For locks with a Bold Connect, when Home Assistant has Bluetooth: **Prefer Bold Connect** (the default), **Prefer Bluetooth**, **Bluetooth only** or **Bold Connect only**. With a preference, the other way is used when the first fails. With **Prefer Bluetooth**, Bluetooth is only tried first when Home Assistant hears the lock well (−85 dBm or better). |
 
+### Linking a lock to its door sensor
+
+A lock that reports its bolt position sometimes misses being turned, and
+keeps showing its last position: locked while the door is open, for example.
+With a contact sensor on the door, link the two under **Settings → Devices &
+services → Bold → Configure**: choose the lock, then its door sensor (a
+`binary_sensor` with the door, garage door or opening device class).
+
+A linked lock shows as **open** while the door is open. Once the door has
+opened since the lock last reported it was locked, it shows as **unlocked**
+until it reports locked again: a door can't open with the bolt thrown. The
+lock remembers when the door last opened across restarts. A sensor that's
+unavailable is ignored. Closing the door doesn't make the lock show as
+locked, as the door can be closed without locking it.
+
 Each Bold Connect is a device too, and the locks it serves are linked to it:
 
 | Entity | What it does |

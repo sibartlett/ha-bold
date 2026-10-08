@@ -33,6 +33,31 @@
       "default": "[%key:common::config_flow::create_entry::authenticated%]"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Link a door sensor",
+        "description": "A lock can miss being unlocked, and keep showing locked. Linked to the door's contact sensor, it shows as open while the door is, and as unlocked once the door has opened since it last reported locked: a door can't open with the bolt thrown.",
+        "data": {
+          "lock": "Lock"
+        }
+      },
+      "door_sensor": {
+        "title": "Door sensor for {lock}",
+        "description": "Choose the contact sensor on {lock}'s door, or clear it to unlink the lock.",
+        "data": {
+          "door_sensor": "Door sensor"
+        },
+        "data_description": {
+          "door_sensor": "A door, garage door or opening sensor that's on while the door is open."
+        }
+      }
+    },
+    "abort": {
+      "not_loaded": "Bold isn't set up at the moment. Try again once it's loaded.",
+      "no_locks": "There are no Bold locks to link."
+    }
+  },
   "entity": {
     "button": {
       "activate": {

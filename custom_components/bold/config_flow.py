@@ -4,13 +4,31 @@ from collections.abc import Mapping
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlowResult
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    ConfigEntry,
+    ConfigEntryState,
+    ConfigFlowResult,
+    OptionsFlowWithReload,
+)
+from homeassistant.core import callback
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+)
 import voluptuous as vol
 
 from .boldsmartlock import BoldClient, BoldError
-from .const import DOMAIN
+from .const import CONF_DOOR_SENSORS, DOMAIN
+
+CONF_LOCK = "lock"
+CONF_DOOR_SENSOR = "door_sensor"
 
 if TYPE_CHECKING:
     from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
@@ -23,6 +41,12 @@ class OAuth2FlowHandler(
     """Handle Bold OAuth2 authentication."""
 
     DOMAIN = DOMAIN
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> BoldOptionsFlow:
+        """Return the options flow, for linking locks to door sensors."""
+        return BoldOptionsFlow()
 
     @property
     def logger(self) -> logging.Logger:
@@ -110,4 +134,83 @@ class OAuth2FlowHandler(
         return self.async_create_entry(
             title=name or (email if isinstance(email, str) else "") or "Bold",
             data=data,
+        )
+
+
+class BoldOptionsFlow(OptionsFlowWithReload):
+    """Link a lock to a door sensor, which shows when the lock missed an unlock."""
+
+    _lock: str
+    _lock_name: str
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Choose the lock."""
+        if self.config_entry.state is not ConfigEntryState.LOADED:
+            return self.async_abort(reason="not_loaded")
+        locks = {
+            str(device.id): device.name
+            for device in self.config_entry.runtime_data.devices.data.values()
+            if device.is_lock or device.is_door_connect
+        }
+        if not locks:
+            return self.async_abort(reason="no_locks")
+        if user_input is not None:
+            self._lock = user_input[CONF_LOCK]
+            self._lock_name = locks[self._lock]
+            return await self.async_step_door_sensor()
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_LOCK): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                SelectOptionDict(value=device_id, label=name)
+                                for device_id, name in sorted(
+                                    locks.items(), key=lambda item: item[1]
+                                )
+                            ]
+                        )
+                    )
+                }
+            ),
+        )
+
+    async def async_step_door_sensor(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Choose the lock's door sensor, or none."""
+        sensors: dict[str, str] = dict(
+            self.config_entry.options.get(CONF_DOOR_SENSORS, {})
+        )
+        if user_input is not None:
+            if sensor := user_input.get(CONF_DOOR_SENSOR):
+                sensors[self._lock] = sensor
+            else:
+                sensors.pop(self._lock, None)
+            return self.async_create_entry(
+                data={**self.config_entry.options, CONF_DOOR_SENSORS: sensors}
+            )
+        return self.async_show_form(
+            step_id="door_sensor",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_DOOR_SENSOR,
+                        description={"suggested_value": sensors.get(self._lock)},
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="binary_sensor",
+                            device_class=[
+                                BinarySensorDeviceClass.DOOR,
+                                BinarySensorDeviceClass.GARAGE_DOOR,
+                                BinarySensorDeviceClass.OPENING,
+                            ],
+                        )
+                    )
+                }
+            ),
+            description_placeholders={"lock": self._lock_name},
         )

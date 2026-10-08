@@ -6,6 +6,9 @@ from typing import Final
 from .boldsmartlock import BoldEventType
 
 DOMAIN: Final = "bold"
+
+# Options: each lock's door sensor, by Bold device ID.
+CONF_DOOR_SENSORS: Final = "door_sensors"
 MANUFACTURER: Final = "Bold"
 
 

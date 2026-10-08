@@ -107,6 +107,8 @@
     'event_log_devices': list([
       1,
     ]),
+    'options': dict({
+    }),
     'push': dict({
       'active': False,
       'bold_webhooks': 0,
