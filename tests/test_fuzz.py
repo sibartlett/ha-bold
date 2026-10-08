@@ -60,6 +60,7 @@ KEYS = [
     "lastName",
     "emailAddress",
     "remoteActivation",
+    "autoActivation",
     "connect",
     "activationTime",
     "keepActiveUntil",

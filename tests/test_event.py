@@ -71,6 +71,8 @@ async def test_activation_event(
     assert state.attributes["method"] == "Pin"
     assert state.attributes["result"] == "Success"
     assert state.attributes["remote"] is False
+    # Bold doesn't say whether this one was automatic.
+    assert state.attributes["automatic"] is None
     assert state.attributes["time"] == "2026-09-24T12:00:10+00:00"
     # Pushed events have no ID, so none is exposed.
     assert "bold_event_id" not in state.attributes
@@ -78,6 +80,27 @@ async def test_activation_event(
     # The same event is returned by the next poll, but must not fire again.
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
     assert hass.states.get(ENTITY_ID).state == "2026-09-24T12:00:30.000+00:00"
+
+
+async def test_automatic_activation(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_api: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test an activation by the Bold app as a phone came near is automatic."""
+    event = event_payload(
+        10,
+        "DeviceActivation",
+        "2026-09-24T12:00:10+00:00",
+        method="Ble",
+        clientId="BoldApp",
+        autoActivation=True,
+        result="Success",
+    )
+    set_events(mock_api, [event])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(ENTITY_ID).attributes["automatic"] is True
 
 
 async def test_event_from_a_clock_ahead(
