@@ -123,11 +123,12 @@ async def test_locked_while_open(
     mock_api: AiohttpClientMocker,
     frozen_time: FrozenDateTimeFactory,
 ) -> None:
-    """Test the bolt thrown with the door open shows unlocked until it closes."""
+    """Test the bolt thrown with the door open shows locked, as reported."""
     await _door(hass, STATE_ON)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
     set_events(mock_api, [_bolt_event(10, "2026-09-24T12:00:20+00:00", "Locked")])
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
-    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
     await _door(hass, STATE_OFF)
     assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
@@ -149,10 +150,10 @@ async def test_late_report_from_before_opening(
 async def test_unlocking_with_the_door_open(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    """Test an activation with the door open shows unlocked, not locking."""
+    """Test an activation with the door open is ready to be locked."""
     await _door(hass, STATE_ON)
     await call_lock(hass, SERVICE_UNLOCK)
-    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKING
 
 
 async def test_sensor_unavailable(

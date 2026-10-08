@@ -12,8 +12,8 @@ unlocking while it's activated with the bolt still thrown. Other locks show as
 unlocked while activated and locked otherwise, as an assumed state.
 
 A lock can be linked to a door sensor. A door can't open with the bolt thrown,
-so the lock shows as unlocked while the door is open, and once it has opened
-since the lock last reported its bolt locked: the lock missed being unlocked.
+so once the door has opened since the lock last reported its bolt locked, the
+lock missed being unlocked, and shows as unlocked until it reports locked.
 """
 
 import asyncio
@@ -179,24 +179,19 @@ class BoldLock(BoldEntity, LockEntity, RestoreEntity):
         )
 
     @property
-    def _door_open(self) -> bool:
-        if self._door_sensor is None or self.hass is None:
-            return False
-        state = self.hass.states.get(self._door_sensor)
-        return state is not None and state.state == STATE_ON
-
-    @property
     def _bolt(self) -> bool | None:
         """Return whether the bolt is thrown, as the lock last reported.
 
-        Unless the door is open, or has opened since the lock reported it
-        locked: a door can't open with the bolt thrown, so the lock missed
-        being unlocked.
+        Unless the door has opened since the lock reported it locked: a door
+        can't open with the bolt thrown, so the lock missed being unlocked.
         """
-        opened_since = self._door_opened_at is not None and (
-            self._bolt_changed is None or self._door_opened_at > self._bolt_changed
-        )
-        if self._bolt_locked and (self._door_open or opened_since):
+        if (
+            self._bolt_locked
+            and self._door_opened_at is not None
+            and (
+                self._bolt_changed is None or self._door_opened_at > self._bolt_changed
+            )
+        ):
             return False
         return self._bolt_locked
 
@@ -273,7 +268,6 @@ class BoldLock(BoldEntity, LockEntity, RestoreEntity):
         return (
             self._reports_bolt
             and self._is_active
-            and not self._door_open
             and self._activation_bolt is locked
             and self._bolt is locked
         )

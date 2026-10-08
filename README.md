@@ -103,9 +103,9 @@ they're activated, which a door doesn't change.
 Each link is listed there as a **Linked door sensor**, such as
 "🔒 Front Door → 🚪 Front Door", to change or delete.
 
-A door can't open with the bolt thrown, so a linked lock shows as
-**unlocked** while the door is open, and once the door has opened since the
-lock last reported it was locked, until it reports locked again. The lock
+A door can't open with the bolt thrown, so once the door has opened since
+the lock last reported it was locked, a linked lock shows as **unlocked**,
+until it reports locked again, even with the door still open. The lock
 remembers when the door last opened across restarts. A sensor that's
 unavailable is ignored. Closing the door doesn't make the lock show as
 locked, as the door can be closed without locking it. If locked status is
