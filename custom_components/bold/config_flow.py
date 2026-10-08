@@ -28,6 +28,9 @@ import voluptuous as vol
 from .boldsmartlock import BoldClient, BoldError
 from .const import CONF_DOOR_SENSOR, CONF_LOCK, DOMAIN, SUBENTRY_DOOR_SENSOR
 
+# Between the lock and its door sensor, in a link's title.
+TITLE_ARROW = " → "
+
 # The contact sensors a door can have.
 DOOR_SENSOR_SELECTOR = EntitySelector(
     EntitySelectorConfig(
@@ -174,7 +177,7 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             lock = user_input[CONF_LOCK]
             return self.async_create_entry(
-                title=locks[lock],
+                title=self._title(locks[lock], user_input[CONF_DOOR_SENSOR]),
                 data={
                     CONF_LOCK: int(lock),
                     CONF_DOOR_SENSOR: user_input[CONF_DOOR_SENSOR],
@@ -205,10 +208,12 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """Choose a different door sensor for the lock."""
         subentry = self._get_reconfigure_subentry()
+        lock_name = subentry.title.partition(TITLE_ARROW)[0]
         if user_input is not None:
             return self.async_update_and_abort(
                 self._get_entry(),
                 subentry,
+                title=self._title(lock_name, user_input[CONF_DOOR_SENSOR]),
                 data_updates={CONF_DOOR_SENSOR: user_input[CONF_DOOR_SENSOR]},
             )
         return self.async_show_form(
@@ -217,5 +222,10 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
                 vol.Schema({vol.Required(CONF_DOOR_SENSOR): DOOR_SENSOR_SELECTOR}),
                 {CONF_DOOR_SENSOR: subentry.data[CONF_DOOR_SENSOR]},
             ),
-            description_placeholders={"lock": subentry.title},
+            description_placeholders={"lock": lock_name},
         )
+
+    def _title(self, lock_name: str, door_sensor: str) -> str:
+        """Return a link's title, showing the lock and its door sensor's name."""
+        state = self.hass.states.get(door_sensor)
+        return f"{lock_name}{TITLE_ARROW}{state.name if state else door_sensor}"

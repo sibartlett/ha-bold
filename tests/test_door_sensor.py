@@ -69,7 +69,7 @@ def mock_config_entry(mock_config_entry: MockConfigEntry) -> MockConfigEntry:
             ConfigSubentryData(
                 data={CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: DOOR},
                 subentry_type=SUBENTRY_DOOR_SENSOR,
-                title="Front Door",
+                title="Front Door → Front Door contact",
                 unique_id=str(LOCK_ID),
             )
         ],
@@ -79,7 +79,7 @@ def mock_config_entry(mock_config_entry: MockConfigEntry) -> MockConfigEntry:
 @pytest.fixture(autouse=True)
 def door_closed(hass: HomeAssistant) -> None:
     """Start with the door closed."""
-    hass.states.async_set(DOOR, STATE_OFF)
+    hass.states.async_set(DOOR, STATE_OFF, {"friendly_name": "Front Door contact"})
 
 
 async def _door(hass: HomeAssistant, state: str) -> None:
@@ -224,7 +224,7 @@ async def test_link_reconfigure_and_unlink(
         result["flow_id"], {CONF_LOCK: str(LOCK_ID), CONF_DOOR_SENSOR: DOOR}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Front Door"
+    assert result["title"] == "Front Door → Front Door contact"
     await hass.async_block_till_done()
     subentry = next(iter(entry.subentries.values()))
     assert subentry.data == {CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: DOOR}
@@ -255,6 +255,10 @@ async def test_link_reconfigure_and_unlink(
     assert result["reason"] == "reconfigure_successful"
     await hass.async_block_till_done()
     assert entry.runtime_data.door_sensors == {LOCK_ID: "binary_sensor.other_door"}
+    # Without a state, the sensor is named by its entity ID.
+    assert entry.subentries[subentry.subentry_id].title == (
+        "Front Door → binary_sensor.other_door"
+    )
 
     assert hass.config_entries.async_remove_subentry(entry, subentry.subentry_id)
     await hass.async_block_till_done()
