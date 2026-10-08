@@ -95,9 +95,10 @@ Each lock gets:
 
 A lock that reports its bolt position sometimes misses being turned, and
 keeps showing its last position: locked while the door is open, for example.
-With a contact sensor on the door, link the two under **Settings → Devices &
-services → Bold → Configure**: choose the lock, then its door sensor (a
-`binary_sensor` with the door, garage door or opening device class).
+With a contact sensor on the door, link the two: under **Settings → Devices &
+services → Bold**, choose **Link a door sensor**, then the lock and its door
+sensor (a `binary_sensor` with the door, garage door or opening device class).
+Each link is listed there under **Door sensors**, to change or delete.
 
 A linked lock shows as **open** while the door is open. Once the door has
 opened since the lock last reported it was locked, it shows as **unlocked**

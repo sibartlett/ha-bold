@@ -7,8 +7,10 @@ from .boldsmartlock import BoldEventType
 
 DOMAIN: Final = "bold"
 
-# Options: each lock's door sensor, by Bold device ID.
-CONF_DOOR_SENSORS: Final = "door_sensors"
+# A subentry linking a lock to its door's contact sensor.
+SUBENTRY_DOOR_SENSOR: Final = "door_sensor"
+CONF_LOCK: Final = "lock"
+CONF_DOOR_SENSOR: Final = "door_sensor"
 MANUFACTURER: Final = "Bold"
 
 

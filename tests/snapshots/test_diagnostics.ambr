@@ -98,6 +98,8 @@
         }),
       }),
     ]),
+    'door_sensors': dict({
+    }),
     'entry': dict({
       'auth_implementation': 'bold',
       'token': '**REDACTED**',
@@ -107,8 +109,6 @@
     'event_log_devices': list([
       1,
     ]),
-    'options': dict({
-    }),
     'push': dict({
       'active': False,
       'bold_webhooks': 0,

@@ -21,6 +21,8 @@ from .boldsmartlock import (
     BoldForbiddenError,
 )
 from .const import (
+    CONF_DOOR_SENSOR,
+    CONF_LOCK,
     DEVICE_SCAN_INTERVAL,
     DOMAIN,
     EVENT_CATCH_UP_INTERVAL,
@@ -29,6 +31,7 @@ from .const import (
     EVENT_PUSH_SCAN_INTERVAL,
     EVENT_SCAN_INTERVAL,
     PUSHED_EVENT_TYPES,
+    SUBENTRY_DOOR_SENSOR,
 )
 from .keys import BoldBluetoothKeys
 from .tracker import BoldBluetoothTracker
@@ -52,6 +55,16 @@ class BoldRuntimeData:
     bluetooth_keys: BoldBluetoothKeys
     bluetooth: BoldBluetoothTracker
     unlock_methods: BoldUnlockMethods
+    # Each linked lock's door sensor, by Bold device ID, as set up.
+    door_sensors: dict[int, str]
+
+
+def door_sensors(entry: ConfigEntry) -> dict[int, str]:
+    """Return each linked lock's door sensor, by Bold device ID."""
+    return {
+        subentry.data[CONF_LOCK]: subentry.data[CONF_DOOR_SENSOR]
+        for subentry in entry.get_subentries_of_type(SUBENTRY_DOOR_SENSOR)
+    }
 
 
 class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):

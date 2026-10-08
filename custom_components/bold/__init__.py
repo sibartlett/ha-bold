@@ -23,6 +23,7 @@ from .coordinator import (
     BoldDeviceCoordinator,
     BoldEventCoordinator,
     BoldRuntimeData,
+    door_sensors,
 )
 from .entity import device_info
 from .issues import async_check_issues, async_delete_issues
@@ -64,6 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
         bluetooth_keys=bluetooth_keys,
         bluetooth=BoldBluetoothTracker(hass),
         unlock_methods=BoldUnlockMethods(),
+        door_sensors=door_sensors(entry),
     )
 
     # Registered before the platforms, so it runs before they add entities for
@@ -78,7 +80,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _async_setup_bluetooth(hass, entry)
     async_setup_push(hass, entry)
+    entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
     return True
+
+
+async def _async_entry_updated(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
+    """Reload when a lock's door sensor is linked, changed or unlinked.
+
+    The entry also changes when its tokens are refreshed, which needs no reload.
+    """
+    if door_sensors(entry) != entry.runtime_data.door_sensors:
+        hass.config_entries.async_schedule_reload(entry.entry_id)
 
 
 async def _async_create_client(

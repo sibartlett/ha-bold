@@ -59,7 +59,6 @@ from .const import (
     BLUETOOTH_FALLBACK_TIMEOUT,
     BLUETOOTH_MIN_RSSI,
     BLUETOOTH_TIMEOUT,
-    CONF_DOOR_SENSORS,
     DEFAULT_ACTIVATION_TIME,
     DOMAIN,
 )
@@ -115,9 +114,7 @@ class BoldLock(BoldEntity, LockEntity, RestoreEntity):
         # The bolt's position when the current activation started: the lock
         # will be turned the other way.
         self._activation_bolt: bool | None = None
-        self._door_sensor: str | None = data.devices.config_entry.options.get(
-            CONF_DOOR_SENSORS, {}
-        ).get(str(device.id))
+        self._door_sensor = data.door_sensors.get(device.id)
         # When the door last opened, by Home Assistant's clock.
         self._door_opened_at: datetime | None = None
         self._update_from_device()

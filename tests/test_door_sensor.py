@@ -1,8 +1,15 @@
 """Tests for a lock linked to its door's contact sensor."""
 
+from unittest.mock import patch
+
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.lock import SERVICE_UNLOCK, LockState
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import (
+    SOURCE_RECONFIGURE,
+    SOURCE_USER,
+    ConfigEntryState,
+    ConfigSubentryData,
+)
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, State
 from homeassistant.data_entry_flow import FlowResultType
@@ -15,7 +22,12 @@ from pytest_homeassistant_custom_component.common import (
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bold.boldsmartlock.const import API_URL
-from custom_components.bold.const import CONF_DOOR_SENSORS, EVENT_SCAN_INTERVAL
+from custom_components.bold.const import (
+    CONF_DOOR_SENSOR,
+    CONF_LOCK,
+    EVENT_SCAN_INTERVAL,
+    SUBENTRY_DOOR_SENSOR,
+)
 
 from .conftest import (
     GATEWAY,
@@ -47,13 +59,20 @@ def devices() -> list[dict]:
 
 @pytest.fixture
 def mock_config_entry(mock_config_entry: MockConfigEntry) -> MockConfigEntry:
-    """Link the lock to its door sensor, closed to begin with."""
+    """Link the lock to its door sensor."""
     return MockConfigEntry(
         domain=mock_config_entry.domain,
         title=mock_config_entry.title,
         unique_id=mock_config_entry.unique_id,
         data=mock_config_entry.data,
-        options={CONF_DOOR_SENSORS: {str(LOCK_ID): DOOR}},
+        subentries_data=[
+            ConfigSubentryData(
+                data={CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: DOOR},
+                subentry_type=SUBENTRY_DOOR_SENSOR,
+                title="Front Door",
+                unique_id=str(LOCK_ID),
+            )
+        ],
     )
 
 
@@ -183,60 +202,89 @@ async def test_open_at_startup(
     assert hass.states.get(LOCK_ENTITY).state == LockState.OPEN
 
 
-async def test_options_link_and_unlink(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+async def test_link_reconfigure_and_unlink(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
 ) -> None:
-    """Test linking a lock to a door sensor, and unlinking it."""
-    entry = init_integration
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "init"
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"lock": str(LOCK_ID)}
+    """Test linking a lock to a door sensor, changing it, and unlinking it."""
+    entry = MockConfigEntry(
+        domain=mock_config_entry.domain,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
     )
-    assert result["step_id"] == "door_sensor"
-    assert result["description_placeholders"] == {"lock": "Front Door"}
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"door_sensor": "binary_sensor.back_door_contact"}
-    )
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    await hass.async_block_till_done()
-    assert entry.options[CONF_DOOR_SENSORS] == {
-        str(LOCK_ID): "binary_sensor.back_door_contact"
-    }
+    await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"lock": str(LOCK_ID)}
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_DOOR_SENSOR), context={"source": SOURCE_USER}
     )
-    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {CONF_LOCK: str(LOCK_ID), CONF_DOOR_SENSOR: DOOR}
+    )
     assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Front Door"
     await hass.async_block_till_done()
-    assert entry.options[CONF_DOOR_SENSORS] == {}
+    subentry = next(iter(entry.subentries.values()))
+    assert subentry.data == {CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: DOOR}
+    assert subentry.unique_id == str(LOCK_ID)
+    # Reloaded with the link.
+    assert entry.runtime_data.door_sensors == {LOCK_ID: DOOR}
+    await _door(hass, STATE_ON)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.OPEN
+    await _door(hass, STATE_OFF)
+
+    # Every lock is linked now.
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_DOOR_SENSOR), context={"source": SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "no_locks"
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_DOOR_SENSOR),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id},
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["description_placeholders"] == {"lock": "Front Door"}
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {CONF_DOOR_SENSOR: "binary_sensor.other_door"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+    assert entry.runtime_data.door_sensors == {LOCK_ID: "binary_sensor.other_door"}
+
+    assert hass.config_entries.async_remove_subentry(entry, subentry.subentry_id)
+    await hass.async_block_till_done()
+    assert entry.runtime_data.door_sensors == {}
     assert entry.state is ConfigEntryState.LOADED
 
 
-async def test_options_not_loaded(
+async def test_entry_update_without_reload(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Test other changes to the entry, e.g. refreshed tokens, don't reload it."""
+    with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+        hass.config_entries.async_update_entry(
+            init_integration, data={**init_integration.data, "refreshed": True}
+        )
+        await hass.async_block_till_done()
+    reload.assert_not_called()
+
+
+async def test_link_not_loaded(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    """Test the options can't be changed while Bold isn't loaded."""
+    """Test a door sensor can't be linked while Bold isn't loaded."""
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_DOOR_SENSOR),
+        context={"source": SOURCE_USER},
+    )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "not_loaded"
-
-
-async def test_options_without_locks(
-    hass: HomeAssistant,
-    setup_credentials: None,
-    mock_config_entry: MockConfigEntry,
-    aioclient_mock: AiohttpClientMocker,
-) -> None:
-    """Test there's nothing to link without locks."""
-    await setup_integration(hass, mock_config_entry, aioclient_mock, [GATEWAY])
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "no_locks"
 
 
 async def test_unlinked_lock_ignores_doors(
