@@ -98,7 +98,8 @@ keeps showing its last position: locked while the door is open, for example.
 With a contact sensor on the door, link the two: under **Settings → Devices &
 services → Bold**, choose **Link a door sensor**, then the lock and its door
 sensor (a `binary_sensor` with the door, garage door or opening device class).
-Each link is listed there under **Door sensors**, to change or delete.
+Each link is listed there as a **Linked door sensor**, such as
+"🔒 Front Door → 🚪 Front Door", to change or delete.
 
 A linked lock shows as **open** while the door is open. Once the door has
 opened since the lock last reported it was locked, it shows as **unlocked**

@@ -28,8 +28,10 @@ import voluptuous as vol
 from .boldsmartlock import BoldClient, BoldError
 from .const import CONF_DOOR_SENSOR, CONF_LOCK, DOMAIN, SUBENTRY_DOOR_SENSOR
 
-# Between the lock and its door sensor, in a link's title.
+# A link's title: the lock, then its door sensor.
+TITLE_LOCK = "🔒 "
 TITLE_ARROW = " → "
+TITLE_DOOR = "🚪 "
 
 # The contact sensors a door can have.
 DOOR_SENSOR_SELECTOR = EntitySelector(
@@ -208,7 +210,7 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """Choose a different door sensor for the lock."""
         subentry = self._get_reconfigure_subentry()
-        lock_name = subentry.title.partition(TITLE_ARROW)[0]
+        lock_name = subentry.title.partition(TITLE_ARROW)[0].removeprefix(TITLE_LOCK)
         if user_input is not None:
             return self.async_update_and_abort(
                 self._get_entry(),
@@ -228,4 +230,5 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
     def _title(self, lock_name: str, door_sensor: str) -> str:
         """Return a link's title, showing the lock and its door sensor's name."""
         state = self.hass.states.get(door_sensor)
-        return f"{lock_name}{TITLE_ARROW}{state.name if state else door_sensor}"
+        door_name = state.name if state else door_sensor
+        return f"{TITLE_LOCK}{lock_name}{TITLE_ARROW}{TITLE_DOOR}{door_name}"
