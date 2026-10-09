@@ -13,8 +13,9 @@ from homeassistant.config_entries import (
     ConfigSubentryFlow,
     SubentryFlowResult,
 )
+from homeassistant.const import Platform
 from homeassistant.core import callback
-from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers import config_entry_oauth2_flow, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     EntitySelector,
@@ -168,7 +169,7 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
             for subentry in entry.get_subentries_of_type(SUBENTRY_DOOR_SENSOR)
         }
         locks = {
-            str(device.id): device.name
+            str(device.id): self._lock_name(device.id, device.name)
             for device in entry.runtime_data.devices.data.values()
             # Only a lock reporting its bolt has a status a door can correct.
             if device.is_lock and device.reports_bolt and str(device.id) not in linked
@@ -209,7 +210,10 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """Choose a different door sensor for the lock."""
         subentry = self._get_reconfigure_subentry()
-        lock_name = subentry.title.partition(TITLE_ARROW)[0].removeprefix(TITLE_LOCK)
+        lock_name = self._lock_name(
+            subentry.data[CONF_LOCK],
+            subentry.title.partition(TITLE_ARROW)[0].removeprefix(TITLE_LOCK),
+        )
         if user_input is not None:
             return self.async_update_and_abort(
                 self._get_entry(),
@@ -225,6 +229,15 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
             ),
             description_placeholders={"lock": lock_name},
         )
+
+    def _lock_name(self, device_id: int, fallback: str) -> str:
+        """Return the lock's name in Home Assistant, like its door sensor's."""
+        entity_id = er.async_get(self.hass).async_get_entity_id(
+            Platform.LOCK, DOMAIN, str(device_id)
+        )
+        if entity_id and (state := self.hass.states.get(entity_id)):
+            return state.name
+        return fallback
 
     def _title(self, lock_name: str, door_sensor: str) -> str:
         """Return a link's title, showing the lock and its door sensor's name."""
