@@ -88,8 +88,16 @@ firmware `update`. See [Entities](https://github.com/sibartlett/ha-bold/blob/mai
 
 - **Bolt position needs the Classic Upgrade** (or a lock that reports it),
   with locked status on. Other locks' state shows whether they're
-  _activated_, not whether the bolt is thrown, as an assumed state.
-  Bolt changes appear within seconds with pushes, or about 30 seconds without.
+  _activated_, not whether the bolt is thrown, as an assumed state, as does
+  any lock with locked status turned off in the Bold app.
+  Bolt changes usually appear within seconds with pushes, or about 30 seconds
+  without.
+- **A lock sometimes misses being turned**, and keeps showing its last
+  position until it's next turned: locked while the door is unlocked, for
+  example. [Link it to its door sensor](https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md)
+  to catch the unlocks it misses.
+- **A lock sometimes holds a bolt change back** until it next checks in with
+  its Bold Connect, up to about 15 minutes later.
 - **Lock can't throw the bolt.** Bold locks are turned by hand; **Lock** only
   ends an activation early.
 - **Delays.** Activity from outside Home Assistant (app, PIN, button, key fob)

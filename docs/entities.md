@@ -45,7 +45,8 @@ The activity entity's `event_type` is one of `activated`, `activation_failed`,
 happened (`time`, by the device's clock, but never later than it reached Home
 Assistant) and who did it (`user`, when Bold knows); activations and
 deactivations add the `method` (e.g. `Pin`, `Button`, `Ble`), whether it
-was `remote` and the `client` that sent it (e.g. `BoldApp` or
+was `remote` (through a Bold Connect, rather than nearby) and the `client`
+that sent it (e.g. `BoldApp` or
 `HomeAssistant`; none for the lock's button or keypad), activations their
 `result` and `automatic` (whether the Bold app activated the lock as a phone
 came near), and tamper alerts the `tamper_type` (`vibration`, `rotations` or

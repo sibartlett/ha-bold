@@ -11,6 +11,10 @@
 
 ## Examples
 
+After a restart, each activity entity comes back with its last event. To
+react only to new activity, the examples below ignore changes from
+`unavailable` or `unknown`, with `not_from`.
+
 Notify on a wrong PIN or a tamper alert:
 
 ```yaml
