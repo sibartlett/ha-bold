@@ -1,19 +1,31 @@
 # Linking a lock to its door sensor
 
-A lock with locked status on sometimes misses being turned, and keeps showing
-its last position: locked while the door is open, for example. With a contact
-sensor on the door, link the two: under **Settings → Devices & services →
-Bold**, choose **Link a door sensor**, then the lock and its door sensor (a
-`binary_sensor` with the door or opening device class). Only locks with locked
-status on can be linked: for other locks, locked and unlocked mean whether
-they're activated, which a door doesn't change.
-Each link is listed there as a **Linked door sensor**, such as
-"🔒 Front Door → 🚪 Front Door", to change or delete.
+A lock with locked status on occasionally misses being turned, and keeps
+showing its last position, such as locked while the door is actually open. If
+the door has a contact sensor, linking the two catches this.
 
-A door can't open with the bolt thrown, so once the door has opened since
-the lock last reported it was locked, a linked lock shows as **unlocked**,
-until it reports locked again, even with the door still open. The lock
-remembers when the door last opened across restarts. A sensor that's
-unavailable is ignored. Closing the door doesn't make the lock show as
-locked, as the door can be closed without locking it. If locked status is
-turned off, the link stays but has no effect.
+## Linking
+
+1. Go to **Settings → Devices & services → Bold**.
+2. Choose **Link a door sensor**.
+3. Pick the lock, and its door sensor: a `binary_sensor` with the door or
+   opening device class.
+
+Each link is listed there as a **Linked door sensor**, such as
+"🔒 Front Door → 🚪 Front Door", where you can change or delete it.
+
+Only locks with locked status on can be linked. For other locks, locked and
+unlocked mean whether they're activated, which the door doesn't change.
+
+## How it works
+
+A door can't open while it's locked. So if the door has opened since the lock
+last reported it was locked, the lock shows as **unlocked**, until it reports
+locked again, even if the door is still open.
+
+- **Closing the door** doesn't make the lock show as locked, as a door can be
+  closed without locking it.
+- **Restarts** don't lose track: the lock remembers when the door last opened.
+- **An unavailable sensor** is ignored. If the door was closed before it went
+  unavailable and is open when it's back, that counts as an opening.
+- **Turning locked status off** leaves the link in place, but it has no effect.
