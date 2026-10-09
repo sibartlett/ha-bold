@@ -1,5 +1,5 @@
 name: Bug report
-description: Something doesn't work as the README describes.
+description: Something doesn't work as the documentation describes.
 labels: [bug]
 body:
   - type: textarea
