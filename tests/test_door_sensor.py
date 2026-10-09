@@ -483,6 +483,60 @@ async def test_sensor_entity_id_renamed(
     assert diagnostics["door_sensors"] == {LOCK_ID: renamed}
 
 
+async def test_titles_follow_renames(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test a link's title follows its lock and door sensor being renamed."""
+    entry = MockConfigEntry(
+        domain=mock_config_entry.domain,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
+        subentries_data=[
+            ConfigSubentryData(
+                data={CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: DOOR},
+                subentry_type=SUBENTRY_DOOR_SENSOR,
+                # Renamed while Home Assistant wasn't running.
+                title="🔒 Old lock → 🚪 Old door",
+                unique_id=str(LOCK_ID),
+            )
+        ],
+    )
+    await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
+    (subentry_id,) = entry.subentries
+
+    def title() -> str:
+        return entry.subentries[subentry_id].title
+
+    assert title() == "🔒 Front Door → 🚪 Front Door contact"
+
+    with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+        entity_registry.async_update_entity(LOCK_ENTITY, name="Front lock")
+        await hass.async_block_till_done()
+        assert title() == "🔒 Front lock → 🚪 Front Door contact"
+        hass.states.async_set(DOOR, STATE_OFF, {"friendly_name": "Front door"})
+        await hass.async_block_till_done()
+        assert title() == "🔒 Front lock → 🚪 Front door"
+        # The door opening, or its sensor going away, leaves the title.
+        hass.states.async_set(DOOR, STATE_ON, {"friendly_name": "Front door"})
+        await hass.async_block_till_done()
+        hass.states.async_remove(DOOR)
+        await hass.async_block_till_done()
+        assert title() == "🔒 Front lock → 🚪 Front door"
+    reload.assert_not_called()
+
+    # A changed entity ID reloads, to follow it.
+    entity_registry.async_update_entity(
+        LOCK_ENTITY, new_entity_id="lock.front_door_lock"
+    )
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert hass.states.get("lock.front_door_lock")
+
+
 async def test_sensor_deleted(
     hass: HomeAssistant,
     setup_credentials: None,
