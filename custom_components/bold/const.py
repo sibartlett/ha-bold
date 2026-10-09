@@ -58,7 +58,9 @@ BLUETOOTH_TIMEOUT: Final = 30
 
 # Repair issues are only raised once a problem has lasted this long.
 ISSUE_AFTER: Final = timedelta(hours=1)
-TROUBLESHOOTING_URL: Final = "https://github.com/sibartlett/ha-bold#troubleshooting"
+TROUBLESHOOTING_URL: Final = (
+    "https://github.com/sibartlett/ha-bold/blob/main/docs/troubleshooting.md"
+)
 DOOR_SENSORS_URL: Final = (
     "https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md"
 )
