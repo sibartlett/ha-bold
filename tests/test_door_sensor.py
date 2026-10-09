@@ -221,22 +221,25 @@ async def test_opening_restored(
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
 
-async def test_other_sensors_opening_not_restored(
+async def test_opening_kept_when_link_changes_sensor(
     hass: HomeAssistant,
     setup_credentials: None,
     mock_config_entry: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    """Test what was stored for a sensor the link no longer uses is ignored."""
+    """Test an opening stored for another sensor still shows the lock unlocked.
+
+    It can only err towards unlocked, until the lock next reports locked.
+    """
     mock_restore_cache_with_extra_data(
         hass,
         [
             (
-                State(LOCK_ENTITY, LockState.LOCKED),
+                State(LOCK_ENTITY, LockState.UNLOCKED),
                 {
-                    "door_sensor": "binary_sensor.wrong_door",
+                    "door_sensor": "binary_sensor.other_door",
                     "door_opened_at": "2026-09-24T11:55:00+00:00",
-                    "door_open": True,
+                    "door_open": False,
                 },
             )
         ],
@@ -244,8 +247,57 @@ async def test_other_sensors_opening_not_restored(
     await setup_integration(
         hass, mock_config_entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY]
     )
-    # The linked door, closed since before the 11:50 locked report.
-    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+    # Opened at 11:55, after the 11:50 locked report.
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+async def test_other_sensors_door_open_not_restored(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test whether another sensor's door was open is ignored.
+
+    Taken as this door's, it would hide this door being open.
+    """
+    await _restart_with(
+        hass,
+        mock_config_entry,
+        aioclient_mock,
+        {
+            "door_sensor": "binary_sensor.other_door",
+            "door_opened_at": "2026-09-24T11:40:00+00:00",
+            "door_open": True,
+            "door_seen_at": "2026-09-24T11:58:00+00:00",
+        },
+        STATE_ON,
+    )
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+async def test_link_changed_away_and_back(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Test an opening survives the link changing to another sensor and back."""
+    await _door(hass, STATE_ON)
+    await _door(hass, STATE_OFF)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+    hass.states.async_set("binary_sensor.other_door", STATE_OFF)
+    (subentry_id,) = init_integration.subentries
+
+    for door_sensor in ("binary_sensor.other_door", DOOR):
+        result = await hass.config_entries.subentries.async_init(
+            (init_integration.entry_id, SUBENTRY_DOOR_SENSOR),
+            context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry_id},
+        )
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {CONF_DOOR_SENSOR: door_sensor}
+        )
+        assert result["reason"] == "reconfigure_successful"
+        await hass.async_block_till_done()
+        assert init_integration.runtime_data.door_sensors == {LOCK_ID: door_sensor}
+        assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
 
 async def _restart_with(
