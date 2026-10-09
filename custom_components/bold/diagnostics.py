@@ -4,6 +4,7 @@ from typing import Any
 
 from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from .coordinator import BoldConfigEntry, BoldRuntimeData
 
@@ -52,7 +53,10 @@ async def async_get_config_entry_diagnostics(
     data = entry.runtime_data
     return {
         "entry": async_redact_data(dict(entry.data), TO_REDACT),
-        "door_sensors": data.door_sensors,
+        "door_sensors": {
+            lock: er.async_resolve_entity_id(er.async_get(hass), door_sensor)
+            for lock, door_sensor in data.door_sensors.items()
+        },
         "devices": _redact([device.raw for device in data.devices.data.values()]),
         "event_log_devices": data.events.device_ids,
         "recent_events": _redact([event.raw for event in data.events.recent_events]),

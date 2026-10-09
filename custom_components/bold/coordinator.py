@@ -56,12 +56,16 @@ class BoldRuntimeData:
     bluetooth_keys: BoldBluetoothKeys
     bluetooth: BoldBluetoothTracker
     unlock_methods: BoldUnlockMethods
-    # Each linked lock's door sensor, by Bold device ID, as set up.
+    # Each linked lock's door sensor, by Bold device ID, as set up: its entity
+    # registry ID, or its entity ID if it isn't in the registry.
     door_sensors: dict[int, str]
 
 
 def door_sensors(entry: ConfigEntry) -> dict[int, str]:
-    """Return each linked lock's door sensor, by Bold device ID."""
+    """Return each linked lock's door sensor, by Bold device ID.
+
+    Each is its entity registry ID, or its entity ID if it isn't in the registry.
+    """
     return {
         subentry.data[CONF_LOCK]: subentry.data[CONF_DOOR_SENSOR]
         for subentry in entry.get_subentries_of_type(SUBENTRY_DOOR_SENSOR)

@@ -28,4 +28,6 @@ locked again, even if the door is still open.
 - **Restarts** don't lose track: the lock remembers when the door last opened.
 - **An unavailable sensor** is ignored. If the door was closed before it went
   unavailable and is open when it's back, that counts as an opening.
+- **Changing the sensor's entity ID** keeps the link. Deleting the sensor
+  leaves the lock as if it wasn't linked.
 - **Turning locked status off** leaves the link in place, but it has no effect.
