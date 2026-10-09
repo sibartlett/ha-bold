@@ -58,6 +58,81 @@ actions:
         using {{ trigger.to_state.attributes.method }}
 ```
 
+Notify when the door is unlocked remotely, through a Bold Connect, rather
+than by someone at the door (`remote`), and say from which app (`client`):
+
+```yaml
+alias: Front door unlocked remotely
+triggers:
+  - trigger: state
+    entity_id: event.front_door_activity
+    not_from: [unavailable, unknown]
+conditions:
+  - condition: state
+    entity_id: event.front_door_activity
+    attribute: event_type
+    state: activated
+  - condition: state
+    entity_id: event.front_door_activity
+    attribute: remote
+    state: true
+actions:
+  - action: notify.notify
+    data:
+      message: >
+        {{ trigger.to_state.attributes.user or "Someone" }} unlocked the front
+        door remotely, from {{ trigger.to_state.attributes.client or "an app" }}.
+```
+
+Turn the hallway light on when someone arrives home, and the Bold app
+activates the lock as their phone comes near (`automatic`):
+
+```yaml
+alias: Welcome home
+triggers:
+  - trigger: state
+    entity_id: event.front_door_activity
+    not_from: [unavailable, unknown]
+conditions:
+  - condition: state
+    entity_id: event.front_door_activity
+    attribute: event_type
+    state: activated
+  - condition: state
+    entity_id: event.front_door_activity
+    attribute: automatic
+    state: true
+  - condition: sun
+    after: sunset
+    before: sunrise
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.hallway
+```
+
+Remind you when the door has been left unlocked for 10 minutes, while it's
+closed. For a lock with locked status, [linking its door
+sensor](door-sensors.md) makes this more reliable: a missed unlock shows as
+soon as the door opens.
+
+```yaml
+alias: Front door left unlocked
+triggers:
+  - trigger: state
+    entity_id: lock.front_door
+    to: unlocked
+    for: "00:10:00"
+conditions:
+  - condition: state
+    entity_id: binary_sensor.front_door
+    state: "off"
+actions:
+  - action: notify.notify
+    data:
+      message: The front door has been unlocked for 10 minutes.
+```
+
 Warn when the Bold Connect is offline:
 
 ```yaml
