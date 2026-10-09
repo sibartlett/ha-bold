@@ -92,6 +92,7 @@ class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
             if event.type in (BoldEventType.ACTIVATION, BoldEventType.DEACTIVATION):
                 attributes["method"] = event.method
                 attributes["remote"] = event.remote_activation
+                attributes["client"] = event.client
             if event.type == BoldEventType.ACTIVATION:
                 attributes["result"] = event.result
                 attributes["automatic"] = event.auto_activation

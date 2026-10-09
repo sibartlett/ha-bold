@@ -120,6 +120,7 @@ class EventPayload(ReadingsPayload, total=False):
     triggeredBy: PersonPayload
     remoteActivation: bool
     autoActivation: bool
+    clientId: str
     connect: ReferencePayload
     activationTime: int | str
     keepActiveUntil: str
