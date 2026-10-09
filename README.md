@@ -52,7 +52,7 @@ There are no other settings. Each Bold account can be added once.
 For activity to appear within seconds, Bold needs to reach Home Assistant from
 the internet: set an external URL (**Settings → System → Network**), or use
 Home Assistant Cloud. Without that, activity is polled instead (see
-[How data is updated](#how-data-is-updated)).
+[How data is updated](https://github.com/sibartlett/ha-bold/blob/main/docs/how-it-works.md)).
 
 If Home Assistant can hear a Bold lock over Bluetooth, or sees a Bold Connect
 join your network, it offers to set up Bold under
@@ -73,222 +73,16 @@ ones.
 
 ## Entities
 
-A Bold lock is not motorised: unlocking it _activates_ the cylinder, so it can
-be turned by hand for a few seconds (the activation time set in the Bold app).
-Each lock gets:
+Each lock gets a `lock` to unlock it, an `event` for its activity (who opened
+it, and how), sensors for its battery and signal, and a firmware `update`.
+With Bluetooth, a `select` chooses whether it's unlocked through its Bold
+Connect or over Bluetooth. Each Bold Connect gets a connectivity sensor and a
+firmware `update`. See [Entities](https://github.com/sibartlett/ha-bold/blob/main/docs/entities.md) for the details.
 
-| Entity | What it does |
-|---|---|
-| `lock.<lock>` | **Unlock** activates the lock. Locks that report their bolt position show it: locked or unlocked, and, while activated and waiting to be turned, unlocking (if it was locked) or locking (if it was unlocked). Other locks show as unlocked while activated and locked otherwise, as an assumed state. **Lock** ends an activation early. `changed_by` shows who last activated or deactivated it. |
-| `event.<lock>_activity` | Fires for activations (with how: PIN, button or Bluetooth, which covers the app, Home Assistant and a Bold Connect; and who, when Bold knows), failed activations such as a wrong PIN, deactivations, tamper alerts (including repeated wrong PINs), and, for locks that report their bolt position, the bolt being locked or unlocked. |
-| `sensor.<lock>_battery_level` | Battery level as Bold reports it: Excellent, High, Medium, Low or Critical. |
-| `binary_sensor.<lock>_battery` | Low battery: on when the level is Low or Critical. |
-| `sensor.<lock>_battery_voltage` | Battery voltage at rest, from the lock's daily status report (and occasional extra readings). |
-| `sensor.<lock>_battery_voltage_under_load` | Battery voltage under load, from the daily status report. Weak batteries sag under load before they drop at rest, so this is the earlier warning. Unknown for a lock that doesn't measure it, e.g. on days its motor didn't run. |
-| `sensor.<lock>_bold_connect_signal` | How well the lock reaches its Bold Connect: Excellent, High, Medium, Low or Critical. |
-| `sensor.<lock>_bold_connect_signal_strength` | The same signal in dBm. Disabled by default. |
-| `sensor.<lock>_bluetooth_signal` | How well Home Assistant hears the lock over Bluetooth, in dBm; unavailable when it can't. Handy for placing an ESPHome Bluetooth proxy. Only when Home Assistant has Bluetooth. |
-| `update.<lock>_firmware` | Whether the lock is on the firmware version Bold requires. |
-| `select.<lock>_unlock_method` | For locks with a Bold Connect, when Home Assistant has Bluetooth: **Prefer Bold Connect** (the default), **Prefer Bluetooth**, **Bluetooth only** or **Bold Connect only**. With a preference, the other way is used when the first fails. With **Prefer Bluetooth**, Bluetooth is only tried first when Home Assistant hears the lock well (−85 dBm or better). |
-
-### Linking a lock to its door sensor
-
-A lock with locked status on sometimes misses being turned, and keeps showing
-its last position: locked while the door is open, for example. With a contact
-sensor on the door, link the two: under **Settings → Devices & services →
-Bold**, choose **Link a door sensor**, then the lock and its door sensor (a
-`binary_sensor` with the door or opening device class). Only locks with locked
-status on can be linked: for other locks, locked and unlocked mean whether
-they're activated, which a door doesn't change.
-Each link is listed there as a **Linked door sensor**, such as
-"🔒 Front Door → 🚪 Front Door", to change or delete.
-
-A door can't open with the bolt thrown, so once the door has opened since
-the lock last reported it was locked, a linked lock shows as **unlocked**,
-until it reports locked again, even with the door still open. The lock
-remembers when the door last opened across restarts. A sensor that's
-unavailable is ignored. Closing the door doesn't make the lock show as
-locked, as the door can be closed without locking it. If locked status is
-turned off, the link stays but has no effect.
-
-Each Bold Connect is a device too, and the locks it serves are linked to it:
-
-| Entity | What it does |
-|---|---|
-| `binary_sensor.<connect>_connectivity` | Online while Bold has heard from the Connect in the last 30 minutes. |
-| `sensor.<connect>_last_seen` | When Bold last heard from the Connect. Disabled by default, as it changes at almost every update. |
-| `update.<connect>_firmware` | Whether the Connect is on the firmware version Bold requires. |
-
-### A Bold Connect with its Controller setting on
-
-With **Controller** on in the Bold app, a Connect switches its relay when
-activated, to open whatever it's wired to. Bold doesn't say what that is, so
-the Connect gets two ways to activate it, both **disabled by default**: enable
-the one that fits, under the Connect's device page.
-
-| Entity | Use it for |
-|---|---|
-| `lock.<connect>` | A door strike, with the relay held for an activation time. **Unlock** activates the Connect, and it shows as unlocked while activated, as an assumed state. Bold may refuse **Lock**, to end an activation early, depending on the Connect's firmware. |
-| `button.<connect>_activate` | A garage door or gate, or a relay set to pulse. **Press** activates the Connect once. |
-
-Activations from elsewhere, such as the Bold app, a PIN or the Connect's own
-button, reach Home Assistant a few seconds late: with a short activation time,
-the lock only shows as unlocked briefly, if at all. The Connect's
-`event.<connect>_activity` is enabled, and is the reliable record of who
-opened it and how.
-
-Voice assistants treat locks and buttons differently. Google Assistant only
-unlocks a lock with the secure devices PIN set in Home Assistant, but runs a
-button like a scene, without one.
-Neither is exposed to voice assistants unless you choose to; think twice
-before exposing the button.
-
-A garage door opener usually toggles, so the same press opens or closes it.
-With a sensor for whether the door is open, and a Connect named Garage, a
-[template cover](https://www.home-assistant.io/integrations/template/#cover)
-only presses the button when the door needs to move:
-
-```yaml
-template:
-  - cover:
-      - name: Garage door
-        device_class: garage
-        state: "{{ is_state('binary_sensor.garage_door', 'on') }}"
-        open_cover:
-          - condition: state
-            entity_id: binary_sensor.garage_door
-            state: "off"
-          - action: button.press
-            target:
-              entity_id: button.garage_activate
-        close_cover:
-          - condition: state
-            entity_id: binary_sensor.garage_door
-            state: "on"
-          - action: button.press
-            target:
-              entity_id: button.garage_activate
-```
-
-The lock and button appear within 10 minutes of turning **Controller** on,
-and become unavailable when it's turned off.
-
-Locks and Bold Connects added to your Bold account appear automatically, and
-ones removed from it are removed from Home Assistant. Entities for features
-turned on later, such as a lock's event log, appear within 10 minutes too.
-
-To see whether a lock is locked, a Bold Elite or an upgraded Bold Classic is required, with **locked status** turned on in the Bold app. Then set
-or turn the lock once: until then Bold doesn't know its position. Home
-Assistant switches over within seconds.
-
-The activity entity's `event_type` is one of `activated`, `activation_failed`,
-`deactivated`, `tamper`, `locked` or `unlocked`. Its attributes say when it
-happened (`time`, by the device's clock, but never later than it reached Home
-Assistant) and who did it (`user`, when Bold knows); activations and
-deactivations add the `method` (e.g. `Pin`, `Button`, `Ble`), whether it
-was `remote` and the `client` that sent it (e.g. `BoldApp` or
-`HomeAssistant`; none for the lock's button or keypad), activations their
-`result` and `automatic` (whether the Bold app activated the lock as a phone
-came near), and tamper alerts the `tamper_type` (`vibration`, `rotations` or
-`faulty_pin`).
-
-## How data is updated
-
-**Pushed within seconds**, when Home Assistant is reachable from the internet
-(through its external URL, or Home Assistant Cloud): the integration registers a
-webhook with Bold, which sends activations, bolt changes, tamper alerts and
-daily status reports as they happen. Deliveries are checked against a secret
-only Bold and Home Assistant know. The webhook is kept up to date across
-restarts, and removed with the integration.
-
-**Polled** otherwise, and as a safety net:
-
-- **Activity** (the event log) every 30 seconds, or every 5 minutes while
-  pushes are working. If a poll finds an event the webhook should have pushed,
-  polling goes back to every 30 seconds until the webhook delivers again.
-  Locks upload their events when a Bold Connect or phone next syncs with them,
-  which can be later, so every 10 minutes a poll looks back an hour to pick up
-  events that arrived late.
-- **Devices** (battery, signal, firmware, Bold Connect status) every 10 minutes.
-- **Battery voltages** come from a status report each lock sends once a day, at
-  a fixed time. They keep their last reading across restarts, and start from
-  the past week's readings when the integration is set up.
-
-Unlocking from Home Assistant updates the lock straight away.
-
-For Bluetooth, Bold's cloud issues each lock a handshake (valid for about a
-week) and signed commands. The integration fetches them every 12 hours and
-stores them, so locks in Bluetooth range can be unlocked for several days
-without internet. Home Assistant tracks which locks it can hear as they
-advertise.
-
-## Use cases
-
-- Unlock the door from a dashboard, a voice assistant or an automation, e.g.
-  for a delivery or a guest.
-- Get notified about failed PIN attempts or tamper alerts.
-- Know who came home, and whether they used the app, a PIN or a key fob.
-- Get warned when a lock's batteries run low or the Bold Connect goes offline,
-  before remote unlocking stops working.
-
-## Examples
-
-Notify on a wrong PIN or a tamper alert:
-
-```yaml
-alias: Front door security alert
-triggers:
-  - trigger: state
-    entity_id: event.front_door_activity
-    not_from: [unavailable, unknown]
-conditions:
-  - condition: state
-    entity_id: event.front_door_activity
-    attribute: event_type
-    state: [activation_failed, tamper]
-actions:
-  - action: notify.notify
-    data:
-      message: >
-        Front door: {{ trigger.to_state.attributes.event_type | replace("_", " ") }}
-        ({{ trigger.to_state.attributes.method or trigger.to_state.attributes.tamper_type }})
-```
-
-Log who opened the door, and how:
-
-```yaml
-alias: Front door opened
-triggers:
-  - trigger: state
-    entity_id: event.front_door_activity
-    not_from: [unavailable, unknown]
-conditions:
-  - condition: state
-    entity_id: event.front_door_activity
-    attribute: event_type
-    state: activated
-actions:
-  - action: logbook.log
-    data:
-      name: Front door
-      message: >
-        opened by {{ trigger.to_state.attributes.user or "someone" }}
-        using {{ trigger.to_state.attributes.method }}
-```
-
-Warn when the Bold Connect is offline:
-
-```yaml
-alias: Bold Connect offline
-triggers:
-  - trigger: state
-    entity_id: binary_sensor.bold_connect_connectivity
-    to: "off"
-actions:
-  - action: notify.notify
-    data:
-      message: The Bold Connect is offline, so the locks can't be unlocked remotely.
-```
+- [Link a lock to its door sensor](https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md), for a
+  more reliable lock status.
+- [A Bold Connect with its Controller setting on](https://github.com/sibartlett/ha-bold/blob/main/docs/controller.md)
+  can open a door, gate or garage door.
 
 ## Known limitations
 
@@ -306,90 +100,25 @@ actions:
   Home Assistant) when a phone with the Bold app passes by.
 - **Battery levels** are the five levels Bold reports, not percentages.
 
-## Troubleshooting
+## Documentation
 
-Home Assistant raises a repair (**Settings → System → Repairs**) when a Bold
-Connect has been offline for an hour, when a lock that can only be unlocked
-over Bluetooth has been out of range for an hour, or when a lock has no way to
-be unlocked from Home Assistant at all. Repairs clear themselves once the
-problem is gone. You can ignore one, e.g. for a lock that's only in range some
-of the time; it's raised again if the problem comes back after being fixed.
-
-- **A lock is unavailable.** Home Assistant has no way to reach it: no Bold
-  Connect it can use (none assigned in the Bold app, or Bold can't be
-  reached), and it isn't in Bluetooth range. Check the lock's Bold Connect
-  signal and that the Connect is online, or its Bluetooth signal.
-- **Unlocking fails with "No Bold Connect is available".** The Connect is
-  offline or out of range of the lock. Check its power and Wi-Fi, and its
-  `connectivity` sensor.
-- **A lock isn't unlocked over Bluetooth.** Home Assistant needs to hear the
-  lock well: add an ESPHome Bluetooth proxy near the door. The integration's
-  diagnostics show whether each lock is reachable, and when its Bluetooth keys
-  expire. When unlocking over Bluetooth fails, the log says why before falling
-  back to the Bold Connect.
-- **Unlocking fails with "Too many requests".** Bold limits how often locks can
-  be activated. Wait a moment and try again.
-- **A lock has no activity entity.** The lock doesn't support Bold's event log.
-  If the log says the account "is not allowed to read the event log", your Bold
-  account doesn't have access to it.
-- **Activity takes up to 30 seconds to appear.** Bold isn't pushing it. Home
-  Assistant needs an external URL Bold can reach, or Home Assistant Cloud. The
-  integration's diagnostics show whether pushes are active, and when the last
-  one arrived; debug logging shows why the webhook couldn't be set up. After changing the external URL, reload the
-  integration so the webhook points at the new address.
-- **The lock shows locked, but someone just opened it.** Locks that don't
-  report their bolt position only show as unlocked while activated (usually a
-  few seconds), which can be over before the activity arrives.
-- **Home Assistant asks to re-authenticate.** Your Bold sign-in expired or was
-  revoked. Follow the prompt and sign in with the same Bold account.
-
-When reporting a problem, include the integration's diagnostics
-(**Settings → Devices & services → Bold Smart Lock → ⋮ → Download diagnostics**)
-and debug logs (**⋮ → Enable debug logging**, reproduce the problem, then
-disable it to download the log). Personal details are removed from diagnostics.
-
-## Removal
-
-1. Go to **Settings → Devices & services → Bold Smart Lock**, open the **⋮**
-   menu and choose **Delete**. This also removes the webhook the integration
-   registered with Bold, and deletes the Bluetooth keys stored for your locks.
-2. To remove the integration's files too, remove **Bold Smart Lock** in HACS and
-   restart Home Assistant.
-3. If you added your own Bold OAuth client, you can remove it under
-   **Settings → Devices & services → ⋮ → Application credentials**.
-
-## Development
-
-The Bold API client and Bluetooth protocol live in
-`custom_components/bold/boldsmartlock/`, which doesn't depend on Home Assistant,
-so in the future it can become a standalone library (as Home Assistant core
-requires). A test keeps it that way.
-
-```sh
-pip install -r requirements_test.txt pre-commit
-pre-commit install  # runs ruff and mypy before each commit
-pytest --cov=custom_components.bold
-python script/translations.py  # after changing strings.json
-pytest --snapshot-update  # after changing entities or diagnostics; review the diff
-HYPOTHESIS_PROFILE=thorough pytest tests/test_fuzz.py  # after changing parsing
-```
-
-CI requires 100% test coverage, and also runs the tests against the oldest
-Home Assistant version in `hacs.json`.
+- [Entities](https://github.com/sibartlett/ha-bold/blob/main/docs/entities.md)
+- [Linking a lock to its door sensor](https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md)
+- [A Bold Connect with its Controller setting on](https://github.com/sibartlett/ha-bold/blob/main/docs/controller.md)
+- [How data is updated](https://github.com/sibartlett/ha-bold/blob/main/docs/how-it-works.md)
+- [Automations](https://github.com/sibartlett/ha-bold/blob/main/docs/automations.md)
+- [Troubleshooting and removal](https://github.com/sibartlett/ha-bold/blob/main/docs/troubleshooting.md)
+- [Contributing](https://github.com/sibartlett/ha-bold/blob/main/CONTRIBUTING.md)
 
 ## Security
 
-The Bluetooth keys are stored in Home Assistant's `.storage` folder, like your
-Bold sign-in and the webhook's secret. Anyone who can read that folder (or a
-backup of it) could unlock your locks over Bluetooth, from within Bluetooth
-range, until the keys expire (about a week). Diagnostics never include any of
-them.
-
-To report a security problem, see [SECURITY.md](SECURITY.md).
+The integration stores Bluetooth keys that can unlock your locks: see
+[where the keys are kept](https://github.com/sibartlett/ha-bold/blob/main/docs/how-it-works.md#where-the-keys-are-kept).
+To report a security problem, see [SECURITY.md](https://github.com/sibartlett/ha-bold/blob/main/SECURITY.md).
 
 ## License
 
-The code is licensed under the [Apache License 2.0](LICENSE). The Bluetooth
+The code is licensed under the [Apache License 2.0](https://github.com/sibartlett/ha-bold/blob/main/LICENSE). The Bluetooth
 protocol is ported from
 [homebridge-bold-ble](https://github.com/robbertkl/homebridge-bold-ble) (MIT). The Bold name and
 logos are trademarks of Bold Smart Lock.
