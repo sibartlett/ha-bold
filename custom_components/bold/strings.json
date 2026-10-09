@@ -33,6 +33,42 @@
       "default": "[%key:common::config_flow::create_entry::authenticated%]"
     }
   },
+  "config_subentries": {
+    "door_sensor": {
+      "entry_type": "Linked door sensor",
+      "initiate_flow": {
+        "user": "Link a door sensor",
+        "reconfigure": "Change door sensor"
+      },
+      "step": {
+        "user": {
+          "title": "Link a door sensor",
+          "description": "Link a lock to its door's contact sensor, for a more reliable lock status.",
+          "data": {
+            "lock": "Lock",
+            "door_sensor": "Door sensor"
+          },
+          "data_description": {
+            "door_sensor": "A door or opening sensor that's on while the door is open."
+          }
+        },
+        "reconfigure": {
+          "title": "Door sensor for {lock}",
+          "data": {
+            "door_sensor": "Door sensor"
+          },
+          "data_description": {
+            "door_sensor": "A door or opening sensor that's on while the door is open."
+          }
+        }
+      },
+      "abort": {
+        "not_loaded": "Bold isn't set up at the moment. Try again once it's loaded.",
+        "no_locks": "There are no Bold locks with locked status left to link.",
+        "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+      }
+    }
+  },
   "entity": {
     "button": {
       "activate": {

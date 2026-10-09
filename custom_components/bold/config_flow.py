@@ -4,13 +4,45 @@ from collections.abc import Mapping
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlowResult
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    ConfigEntry,
+    ConfigEntryState,
+    ConfigFlowResult,
+    ConfigSubentryFlow,
+    SubentryFlowResult,
+)
+from homeassistant.core import callback
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+)
 import voluptuous as vol
 
 from .boldsmartlock import BoldClient, BoldError
-from .const import DOMAIN
+from .const import CONF_DOOR_SENSOR, CONF_LOCK, DOMAIN, SUBENTRY_DOOR_SENSOR
+
+# A link's title: the lock, then its door sensor.
+TITLE_LOCK = "🔒 "
+TITLE_ARROW = " → "
+TITLE_DOOR = "🚪 "
+
+# The contact sensors a door can have.
+DOOR_SENSOR_SELECTOR = EntitySelector(
+    EntitySelectorConfig(
+        domain="binary_sensor",
+        device_class=[
+            BinarySensorDeviceClass.DOOR,
+            BinarySensorDeviceClass.OPENING,
+        ],
+    )
+)
 
 if TYPE_CHECKING:
     from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
@@ -23,6 +55,14 @@ class OAuth2FlowHandler(
     """Handle Bold OAuth2 authentication."""
 
     DOMAIN = DOMAIN
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        """Return the subentries: a lock linked to its door sensor."""
+        return {SUBENTRY_DOOR_SENSOR: DoorSensorSubentryFlow}
 
     @property
     def logger(self) -> logging.Logger:
@@ -111,3 +151,83 @@ class OAuth2FlowHandler(
             title=name or (email if isinstance(email, str) else "") or "Bold",
             data=data,
         )
+
+
+class DoorSensorSubentryFlow(ConfigSubentryFlow):
+    """Link a lock to its door sensor, which shows when the lock missed an unlock."""
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Choose a lock that isn't linked yet, and its door sensor."""
+        entry = self._get_entry()
+        if entry.state is not ConfigEntryState.LOADED:
+            return self.async_abort(reason="not_loaded")
+        linked = {
+            subentry.unique_id
+            for subentry in entry.get_subentries_of_type(SUBENTRY_DOOR_SENSOR)
+        }
+        locks = {
+            str(device.id): device.name
+            for device in entry.runtime_data.devices.data.values()
+            # Only a lock reporting its bolt has a status a door can correct.
+            if device.is_lock and device.reports_bolt and str(device.id) not in linked
+        }
+        if not locks:
+            return self.async_abort(reason="no_locks")
+        if user_input is not None:
+            lock = user_input[CONF_LOCK]
+            return self.async_create_entry(
+                title=self._title(locks[lock], user_input[CONF_DOOR_SENSOR]),
+                data={
+                    CONF_LOCK: int(lock),
+                    CONF_DOOR_SENSOR: user_input[CONF_DOOR_SENSOR],
+                },
+                unique_id=lock,
+            )
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_LOCK): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                SelectOptionDict(value=device_id, label=name)
+                                for device_id, name in sorted(
+                                    locks.items(), key=lambda item: item[1]
+                                )
+                            ]
+                        )
+                    ),
+                    vol.Required(CONF_DOOR_SENSOR): DOOR_SENSOR_SELECTOR,
+                }
+            ),
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Choose a different door sensor for the lock."""
+        subentry = self._get_reconfigure_subentry()
+        lock_name = subentry.title.partition(TITLE_ARROW)[0].removeprefix(TITLE_LOCK)
+        if user_input is not None:
+            return self.async_update_and_abort(
+                self._get_entry(),
+                subentry,
+                title=self._title(lock_name, user_input[CONF_DOOR_SENSOR]),
+                data_updates={CONF_DOOR_SENSOR: user_input[CONF_DOOR_SENSOR]},
+            )
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema({vol.Required(CONF_DOOR_SENSOR): DOOR_SENSOR_SELECTOR}),
+                {CONF_DOOR_SENSOR: subentry.data[CONF_DOOR_SENSOR]},
+            ),
+            description_placeholders={"lock": lock_name},
+        )
+
+    def _title(self, lock_name: str, door_sensor: str) -> str:
+        """Return a link's title, showing the lock and its door sensor's name."""
+        state = self.hass.states.get(door_sensor)
+        door_name = state.name if state else door_sensor
+        return f"{TITLE_LOCK}{lock_name}{TITLE_ARROW}{TITLE_DOOR}{door_name}"

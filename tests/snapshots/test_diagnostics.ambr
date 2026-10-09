@@ -98,6 +98,8 @@
         }),
       }),
     ]),
+    'door_sensors': dict({
+    }),
     'entry': dict({
       'auth_implementation': 'bold',
       'token': '**REDACTED**',

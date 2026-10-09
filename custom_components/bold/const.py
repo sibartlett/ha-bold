@@ -6,6 +6,11 @@ from typing import Final
 from .boldsmartlock import BoldEventType
 
 DOMAIN: Final = "bold"
+
+# A subentry linking a lock to its door's contact sensor.
+SUBENTRY_DOOR_SENSOR: Final = "door_sensor"
+CONF_LOCK: Final = "lock"
+CONF_DOOR_SENSOR: Final = "door_sensor"
 MANUFACTURER: Final = "Bold"
 
 

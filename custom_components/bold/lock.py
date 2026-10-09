@@ -10,6 +10,10 @@ so its lock is disabled by default, as is its button.
 Upgraded locks report their bolt position: the lock shows that, and shows as
 unlocking while it's activated with the bolt still thrown. Other locks show as
 unlocked while activated and locked otherwise, as an assumed state.
+
+A lock can be linked to a door sensor. A door can't open with the bolt thrown,
+so once the door has opened since the lock last reported its bolt locked, the
+lock missed being unlocked, and shows as unlocked until it reports locked.
 """
 
 import asyncio
@@ -19,10 +23,26 @@ import logging
 from typing import Any
 
 from homeassistant.components.lock import LockEntity
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.const import STATE_OFF, STATE_ON
+from homeassistant.core import (
+    CALLBACK_TYPE,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    State,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.event import async_track_point_in_utc_time
+from homeassistant.helpers.event import (
+    async_track_point_in_utc_time,
+    async_track_state_change_event,
+)
+from homeassistant.helpers.restore_state import (
+    ExtraStoredData,
+    RestoredExtraData,
+    RestoreEntity,
+)
 from homeassistant.util import dt as dt_util
 
 from .boldsmartlock import (
@@ -50,6 +70,10 @@ _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 1
 
+ATTR_DOOR_OPENED_AT = "door_opened_at"
+ATTR_DOOR_OPEN = "door_open"
+ATTR_DOOR_SEEN_AT = "door_seen_at"
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -70,7 +94,7 @@ async def async_setup_entry(
     )
 
 
-class BoldLock(BoldEntity, LockEntity):
+class BoldLock(BoldEntity, LockEntity, RestoreEntity):
     """A Bold Smart Lock, or a Bold Connect wired to a door."""
 
     _attr_name = None
@@ -92,6 +116,11 @@ class BoldLock(BoldEntity, LockEntity):
         # The bolt's position when the current activation started: the lock
         # will be turned the other way.
         self._activation_bolt: bool | None = None
+        self._door_sensor = data.door_sensors.get(device.id)
+        # When the door last opened, by Home Assistant's clock.
+        self._door_opened_at: datetime | None = None
+        # Whether the door was last seen open, ignoring an unavailable sensor.
+        self._door_was_open: bool | None = None
         self._update_from_device()
 
     async def async_added_to_hass(self) -> None:
@@ -116,6 +145,85 @@ class BoldLock(BoldEntity, LockEntity):
         )
         self.async_on_remove(self._cancel_expiry)
         self._schedule_expiry()
+        if self._door_sensor is not None:
+            await self._async_follow_door(self._door_sensor)
+
+    async def _async_follow_door(self, door_sensor: str) -> None:
+        """Follow the door sensor, remembering when the door last opened."""
+        seen_at: datetime | None = None
+        if data := await self.async_get_last_extra_data():
+            stored = data.as_dict()
+            self._door_opened_at = _stored_time(stored.get(ATTR_DOOR_OPENED_AT))
+            seen_at = _stored_time(stored.get(ATTR_DOOR_SEEN_AT))
+            if isinstance(open_ := stored.get(ATTR_DOOR_OPEN), bool):
+                self._door_was_open = open_
+        if state := self.hass.states.get(door_sensor):
+            # Opened while Home Assistant wasn't watching: at the earliest, when
+            # it last saw the door closed.
+            self._door_seen(state, seen_at or state.last_changed)
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, door_sensor, self._handle_door_change
+            )
+        )
+
+    @callback
+    def _handle_door_change(self, event: Event[EventStateChangedData]) -> None:
+        if (new := event.data["new_state"]) is not None:
+            old = event.data["old_state"]
+            # Back from unavailable: opened, at the earliest, when it went.
+            unseen_since = (
+                old.last_changed
+                if old is not None and old.state not in (STATE_ON, STATE_OFF)
+                else new.last_changed
+            )
+            self._door_seen(new, unseen_since)
+        self.async_write_ha_state()
+
+    def _door_seen(self, state: State, opened_at: datetime) -> None:
+        """Take the door's state, if the sensor knows it."""
+        if state.state not in (STATE_ON, STATE_OFF):
+            return
+        is_open = state.state == STATE_ON
+        if is_open and self._door_was_open is not True:
+            self._door_opened(opened_at)
+        self._door_was_open = is_open
+
+    def _door_opened(self, at: datetime) -> None:
+        if self._door_opened_at is None or at > self._door_opened_at:
+            self._door_opened_at = at
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData | None:
+        """Remember the door across restarts: when it last opened, and how it was."""
+        if self._door_sensor is None:
+            return None
+        return RestoredExtraData(
+            {
+                ATTR_DOOR_OPENED_AT: (
+                    self._door_opened_at.isoformat() if self._door_opened_at else None
+                ),
+                ATTR_DOOR_OPEN: self._door_was_open,
+                ATTR_DOOR_SEEN_AT: dt_util.utcnow().isoformat(),
+            }
+        )
+
+    @property
+    def _bolt(self) -> bool | None:
+        """Return whether the bolt is thrown, as the lock last reported.
+
+        Unless the door has opened since the lock reported it locked: a door
+        can't open with the bolt thrown, so the lock missed being unlocked.
+        """
+        if (
+            self._bolt_locked
+            and self._door_opened_at is not None
+            and (
+                self._bolt_changed is None or self._door_opened_at > self._bolt_changed
+            )
+        ):
+            return False
+        return self._bolt_locked
 
     @property
     def available(self) -> bool:
@@ -169,7 +277,7 @@ class BoldLock(BoldEntity, LockEntity):
     def is_locked(self) -> bool:
         """Return whether the bolt is thrown, or else the lock isn't activated."""
         if self._reports_bolt:
-            return bool(self._bolt_locked)
+            return bool(self._bolt)
         return not self._is_active
 
     @property
@@ -191,7 +299,7 @@ class BoldLock(BoldEntity, LockEntity):
             self._reports_bolt
             and self._is_active
             and self._activation_bolt is locked
-            and self._bolt_locked is locked
+            and self._bolt is locked
         )
 
     @property
@@ -217,7 +325,7 @@ class BoldLock(BoldEntity, LockEntity):
     async def async_lock(self, **kwargs: Any) -> None:
         """End an activation early. Bold locks can't throw the bolt themselves."""
         if not self._is_active:
-            if self._reports_bolt and not self._bolt_locked:
+            if self._reports_bolt and not self._bolt:
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
                     translation_key="bolt_open",
@@ -232,7 +340,7 @@ class BoldLock(BoldEntity, LockEntity):
         """Send a command, showing the lock as unlocking or locking meanwhile."""
         # Activating an unlocked bolt lets it be turned to lock.
         unlocking = command_type == COMMAND_ACTIVATE and not (
-            self._reports_bolt and self._bolt_locked is False
+            self._reports_bolt and self._bolt is False
         )
         self._attr_is_unlocking = unlocking
         self._attr_is_locking = not unlocking
@@ -398,7 +506,7 @@ class BoldLock(BoldEntity, LockEntity):
     def _set_active(self, start: datetime, until: datetime) -> None:
         if not self._is_active:
             # A new activation, rather than a later report of the same one.
-            self._activation_bolt = self._bolt_locked
+            self._activation_bolt = self._bolt
         self._activated_at = start
         self._active_until = until
         self._schedule_expiry()
@@ -427,3 +535,8 @@ class BoldLock(BoldEntity, LockEntity):
     def _expired(self, _now: datetime) -> None:
         self._unsub_expiry = None
         self.async_write_ha_state()
+
+
+def _stored_time(value: Any) -> datetime | None:
+    """Return a time stored across restarts, if it's one."""
+    return dt_util.parse_datetime(value) if isinstance(value, str) else None

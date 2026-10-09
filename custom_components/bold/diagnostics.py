@@ -52,6 +52,7 @@ async def async_get_config_entry_diagnostics(
     data = entry.runtime_data
     return {
         "entry": async_redact_data(dict(entry.data), TO_REDACT),
+        "door_sensors": data.door_sensors,
         "devices": _redact([device.raw for device in data.devices.data.values()]),
         "event_log_devices": data.events.device_ids,
         "recent_events": _redact([event.raw for event in data.events.recent_events]),
