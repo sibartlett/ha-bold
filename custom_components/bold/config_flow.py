@@ -27,7 +27,7 @@ import voluptuous as vol
 
 from .boldsmartlock import BoldClient, BoldError
 from .const import CONF_DOOR_SENSOR, CONF_LOCK, DOMAIN, SUBENTRY_DOOR_SENSOR
-from .links import link_title, lock_entity_id, title_lock_name
+from .links import link_title, lock_name, title_lock_name
 
 # The contact sensors a door can have.
 DOOR_SENSOR_SELECTOR = EntitySelector(
@@ -164,7 +164,7 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
             for subentry in entry.get_subentries_of_type(SUBENTRY_DOOR_SENSOR)
         }
         locks = {
-            str(device.id): self._lock_name(device.id, device.name)
+            str(device.id): lock_name(self.hass, device.id, device.name)
             for device in entry.runtime_data.devices.data.values()
             # Only a lock reporting its bolt has a status a door can correct.
             if device.is_lock and device.reports_bolt and str(device.id) not in linked
@@ -205,14 +205,14 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """Choose a different door sensor for the lock."""
         subentry = self._get_reconfigure_subentry()
-        lock_name = self._lock_name(
-            subentry.data[CONF_LOCK], title_lock_name(subentry.title)
+        name = lock_name(
+            self.hass, subentry.data[CONF_LOCK], title_lock_name(subentry.title)
         )
         if user_input is not None:
             return self.async_update_and_abort(
                 self._get_entry(),
                 subentry,
-                title=self._title(lock_name, user_input[CONF_DOOR_SENSOR]),
+                title=self._title(name, user_input[CONF_DOOR_SENSOR]),
                 data_updates={
                     CONF_DOOR_SENSOR: self._registry_id(user_input[CONF_DOOR_SENSOR])
                 },
@@ -227,7 +227,7 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
                     )
                 },
             ),
-            description_placeholders={"lock": lock_name},
+            description_placeholders={"lock": name},
         )
 
     def _registry_id(self, entity_id: str) -> str:
@@ -239,16 +239,8 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
             return entry.id
         return entity_id
 
-    def _lock_name(self, device_id: int, fallback: str) -> str:
-        """Return the lock's name in Home Assistant, like its door sensor's."""
-        if (entity_id := lock_entity_id(self.hass, device_id)) and (
-            state := self.hass.states.get(entity_id)
-        ):
-            return state.name
-        return fallback
-
-    def _title(self, lock_name: str, door_sensor: str) -> str:
+    def _title(self, lock: str, door_sensor: str) -> str:
         """Return a link's title, showing the lock and its door sensor's name."""
         state = self.hass.states.get(door_sensor)
         door_name = state.name if state else door_sensor
-        return link_title(lock_name, door_name)
+        return link_title(lock, door_name)

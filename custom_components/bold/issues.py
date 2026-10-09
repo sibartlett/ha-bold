@@ -19,7 +19,7 @@ from .const import (
     TROUBLESHOOTING_URL,
 )
 from .coordinator import BoldConfigEntry, BoldRuntimeData
-from .links import title_lock_name
+from .links import lock_name, title_lock_name
 from .unlock import UnlockMethod
 
 ISSUE_PREFIXES = (
@@ -91,22 +91,27 @@ def _lock_issues(
             )
 
 
+def _sensor_missing(hass: HomeAssistant, door_sensor: str) -> bool:
+    """Return whether a linked door sensor was deleted or disabled."""
+    registry = er.async_get(hass)
+    if (entity_id := er.async_resolve_entity_id(registry, door_sensor)) is None:
+        return True
+    if (registry_entry := registry.async_get(entity_id)) is not None:
+        return registry_entry.disabled
+    # A sensor outside the registry has no state until its integration has set
+    # it up, which may be after Bold, until Home Assistant is running.
+    return hass.state is CoreState.running and hass.states.get(entity_id) is None
+
+
 def _link_issues(hass: HomeAssistant, entry: BoldConfigEntry) -> Iterator[Issue]:
     """Door sensor links that no longer do anything."""
-    registry = er.async_get(hass)
     devices = entry.runtime_data.devices.data
     for subentry in entry.get_subentries_of_type(SUBENTRY_DOOR_SENSOR):
         lock_id = subentry.data[CONF_LOCK]
-        placeholders = {"lock": title_lock_name(subentry.title)}
-        door = er.async_resolve_entity_id(registry, subentry.data[CONF_DOOR_SENSOR])
-        if door is None or (
-            # A sensor outside the registry has no state until its integration
-            # has set it up, which may be after Bold, until Home Assistant is
-            # running.
-            hass.state is CoreState.running
-            and registry.async_get(door) is None
-            and hass.states.get(door) is None
-        ):
+        placeholders = {
+            "lock": lock_name(hass, lock_id, title_lock_name(subentry.title))
+        }
+        if _sensor_missing(hass, subentry.data[CONF_DOOR_SENSOR]):
             yield (
                 f"door_sensor_missing_{lock_id}",
                 "door_sensor_missing",

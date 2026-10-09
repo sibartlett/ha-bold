@@ -621,15 +621,58 @@ async def test_sensor_outside_registry_missing(
     assert not issue_registry.async_get_issue(DOMAIN, MISSING_ISSUE)
 
 
+async def test_sensor_disabled(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    setup_credentials: None,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+    issue_registry: ir.IssueRegistry,
+) -> None:
+    """Test a disabled door sensor counts as missing, like a deleted one."""
+    hass.states.async_remove(DOOR)
+    sensor = entity_registry.async_get_or_create(
+        "binary_sensor", "test", "door", suggested_object_id="front_door_contact"
+    )
+    hass.states.async_set(DOOR, STATE_OFF)
+    entry = MockConfigEntry(
+        domain=mock_config_entry.domain,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
+        subentries_data=[
+            ConfigSubentryData(
+                data={CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: sensor.id},
+                subentry_type=SUBENTRY_DOOR_SENSOR,
+                title="🔒 Front Door → 🚪 Front Door contact",
+                unique_id=str(LOCK_ID),
+            )
+        ],
+    )
+    await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
+    assert not issue_registry.async_get_issue(DOMAIN, MISSING_ISSUE)
+
+    entity_registry.async_update_entity(DOOR, disabled_by=er.RegistryEntryDisabler.USER)
+    await advance(hass, freezer, DEVICE_SCAN_INTERVAL)
+    assert issue_registry.async_get_issue(DOMAIN, MISSING_ISSUE)
+
+    entity_registry.async_update_entity(DOOR, disabled_by=None)
+    await advance(hass, freezer, DEVICE_SCAN_INTERVAL)
+    assert not issue_registry.async_get_issue(DOMAIN, MISSING_ISSUE)
+
+
 async def test_locked_status_turned_off(
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
     init_integration: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
+    entity_registry: er.EntityRegistry,
     issue_registry: ir.IssueRegistry,
 ) -> None:
     """Test a repair says a link has no effect while locked status is off."""
     assert not issue_registry.async_get_issue(DOMAIN, NO_LOCKED_STATUS_ISSUE)
+    # Named as in Home Assistant, which a title can't always be split back into.
+    entity_registry.async_update_entity(LOCK_ENTITY, name="Front → Door")
 
     def poll_devices(locked_status: bool) -> None:
         aioclient_mock.clear_requests()
@@ -644,7 +687,7 @@ async def test_locked_status_turned_off(
     await advance(hass, freezer, DEVICE_SCAN_INTERVAL)
     issue = issue_registry.async_get_issue(DOMAIN, NO_LOCKED_STATUS_ISSUE)
     assert issue is not None
-    assert issue.translation_placeholders == {"lock": "Front Door"}
+    assert issue.translation_placeholders == {"lock": "Front → Door"}
     assert not issue_registry.async_get_issue(DOMAIN, MISSING_ISSUE)
 
     poll_devices(locked_status=True)

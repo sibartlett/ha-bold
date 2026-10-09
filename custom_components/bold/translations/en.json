@@ -190,8 +190,8 @@
       "description": "**{name}** has no Bold Connect, and Home Assistant has no Bluetooth to reach it directly.\n\nAdd a Bold Connect to the lock in the Bold app, or give Home Assistant Bluetooth, for example with an ESPHome Bluetooth proxy near the lock."
     },
     "door_sensor_missing": {
-      "title": "{lock}'s door sensor no longer exists",
-      "description": "The door sensor linked to **{lock}** has been deleted, so the lock can no longer tell when it missed being unlocked.\n\nOn the Bold integration's page, change the link to the door's sensor, or delete the link."
+      "title": "{lock}'s door sensor is missing",
+      "description": "The door sensor linked to **{lock}** has been deleted or disabled, so the lock can no longer tell when it missed being unlocked.\n\nEnable the sensor again, or on the Bold integration's page, change the link to the door's sensor, or delete the link."
     },
     "door_sensor_no_locked_status": {
       "title": "{lock}'s door sensor has no effect",
