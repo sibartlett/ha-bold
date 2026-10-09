@@ -363,6 +363,57 @@ async def test_link_reconfigure_and_unlink(
     assert entry.state is ConfigEntryState.LOADED
 
 
+async def test_reconfigure_renamed_lock(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test changing a link uses the lock's name in Bold, or else as linked."""
+    entry = MockConfigEntry(
+        domain=mock_config_entry.domain,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
+        subentries_data=[
+            ConfigSubentryData(
+                data={CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: DOOR},
+                subentry_type=SUBENTRY_DOOR_SENSOR,
+                # Since renamed in the Bold app; names can contain the arrow.
+                title="🔒 Old → Name → 🚪 Front Door contact",
+                unique_id=str(LOCK_ID),
+            )
+        ],
+    )
+    await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
+    subentry_id = next(iter(entry.subentries))
+
+    async def reconfigure() -> str:
+        result = await hass.config_entries.subentries.async_init(
+            (entry.entry_id, SUBENTRY_DOOR_SENSOR),
+            context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry_id},
+        )
+        assert result["type"] is FlowResultType.FORM
+        lock_name: str = result["description_placeholders"]["lock"]
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {CONF_DOOR_SENSOR: DOOR}
+        )
+        assert result["reason"] == "reconfigure_successful"
+        await hass.async_block_till_done()
+        return lock_name
+
+    assert await reconfigure() == "Front Door"
+    assert entry.subentries[subentry_id].title == (
+        "🔒 Front Door → 🚪 Front Door contact"
+    )
+
+    # Not loaded: as it was when linked.
+    hass.config_entries.async_update_subentry(
+        entry, entry.subentries[subentry_id], title="🔒 Back Door → 🚪 Door"
+    )
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert await reconfigure() == "Back Door"
+
+
 async def test_lock_without_locked_status_not_offered(
     hass: HomeAssistant,
     setup_credentials: None,

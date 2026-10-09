@@ -10,6 +10,7 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigEntryState,
     ConfigFlowResult,
+    ConfigSubentry,
     ConfigSubentryFlow,
     SubentryFlowResult,
 )
@@ -27,6 +28,7 @@ import voluptuous as vol
 
 from .boldsmartlock import BoldClient, BoldError
 from .const import CONF_DOOR_SENSOR, CONF_LOCK, DOMAIN, SUBENTRY_DOOR_SENSOR
+from .coordinator import BoldConfigEntry
 
 # A link's title: the lock, then its door sensor.
 TITLE_LOCK = "🔒 "
@@ -209,7 +211,7 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """Choose a different door sensor for the lock."""
         subentry = self._get_reconfigure_subentry()
-        lock_name = subentry.title.partition(TITLE_ARROW)[0].removeprefix(TITLE_LOCK)
+        lock_name = self._lock_name(subentry)
         if user_input is not None:
             return self.async_update_and_abort(
                 self._get_entry(),
@@ -225,6 +227,15 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
             ),
             description_placeholders={"lock": lock_name},
         )
+
+    def _lock_name(self, subentry: ConfigSubentry) -> str:
+        """Return the lock's name in Bold, or else as it was when linked."""
+        entry: BoldConfigEntry = self._get_entry()
+        if entry.state is ConfigEntryState.LOADED and (
+            device := entry.runtime_data.devices.data.get(subentry.data[CONF_LOCK])
+        ):
+            return device.name
+        return subentry.title.partition(TITLE_ARROW)[0].removeprefix(TITLE_LOCK)
 
     def _title(self, lock_name: str, door_sensor: str) -> str:
         """Return a link's title, showing the lock and its door sensor's name."""
