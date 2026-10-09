@@ -36,6 +36,16 @@ def lock_entity_id(hass: HomeAssistant, device_id: int) -> str | None:
 
 
 @callback
+def lock_name(hass: HomeAssistant, device_id: int, fallback: str) -> str:
+    """Return a lock's name in Home Assistant, like its door sensor's."""
+    if (entity_id := lock_entity_id(hass, device_id)) and (
+        state := hass.states.get(entity_id)
+    ):
+        return state.name
+    return fallback
+
+
+@callback
 def async_follow_links(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
     """Follow linked locks and door sensors as they're renamed.
 
