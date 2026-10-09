@@ -87,16 +87,10 @@ Two optional extras:
 - **Whether a door is locked** needs a Bold Elite or an upgraded Bold
   Classic, with locked status turned on in the Bold app. Other locks show as
   unlocked only while they're activated.
-- **Locks occasionally miss being turned**, and keep showing their last
-  position. [Linking a door sensor](https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md)
-  catches a missed unlock as soon as the door opens.
-- **Some updates arrive late.** A lock sometimes holds back a lock or unlock
-  until it next checks in with its Bold Connect, up to about 15 minutes. A
-  Bold Connect going offline is noticed after 30–40 minutes.
 - **Locks without a Bold Connect** only report activity when a phone with the
   Bold app passes by.
-- **Battery levels** are Bold's five levels, from Excellent to Critical, not
-  percentages.
+
+See all the [known limitations](https://github.com/sibartlett/ha-bold/blob/main/docs/troubleshooting.md#known-limitations).
 
 ## Learn more
 
@@ -105,7 +99,7 @@ Two optional extras:
 - [Using a Bold Connect as a door, gate or garage opener](https://github.com/sibartlett/ha-bold/blob/main/docs/controller.md)
 - [Automation ideas and examples](https://github.com/sibartlett/ha-bold/blob/main/docs/automations.md)
 - [How updates reach Home Assistant](https://github.com/sibartlett/ha-bold/blob/main/docs/how-it-works.md)
-- [Troubleshooting and removal](https://github.com/sibartlett/ha-bold/blob/main/docs/troubleshooting.md)
+- [Troubleshooting, known limitations and removal](https://github.com/sibartlett/ha-bold/blob/main/docs/troubleshooting.md)
 - [Contributing](https://github.com/sibartlett/ha-bold/blob/main/CONTRIBUTING.md)
 
 ## Security
