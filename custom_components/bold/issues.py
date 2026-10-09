@@ -4,16 +4,37 @@ from collections.abc import Iterator
 from datetime import datetime
 from itertools import chain
 
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.core import CoreState, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
 from homeassistant.util import dt as dt_util
 
 from .boldsmartlock import COMMAND_ACTIVATE, BoldDevice
-from .const import DOMAIN, ISSUE_AFTER, TROUBLESHOOTING_URL
+from .const import (
+    CONF_DOOR_SENSOR,
+    CONF_LOCK,
+    DOMAIN,
+    DOOR_SENSORS_URL,
+    ISSUE_AFTER,
+    SUBENTRY_DOOR_SENSOR,
+    TROUBLESHOOTING_URL,
+)
 from .coordinator import BoldConfigEntry, BoldRuntimeData
+from .links import title_lock_name
 from .unlock import UnlockMethod
 
-ISSUE_PREFIXES = ("connect_offline_", "lock_out_of_range_", "lock_no_route_")
+ISSUE_PREFIXES = (
+    "connect_offline_",
+    "lock_out_of_range_",
+    "lock_no_route_",
+    "door_sensor_missing_",
+    "door_sensor_no_locked_status_",
+)
+
+# Where to learn more, if not troubleshooting, by translation key.
+LEARN_MORE_URLS = {
+    "door_sensor_missing": DOOR_SENSORS_URL,
+    "door_sensor_no_locked_status": DOOR_SENSORS_URL,
+}
 
 
 def _local(time: datetime) -> str:
@@ -70,6 +91,35 @@ def _lock_issues(
             )
 
 
+def _link_issues(hass: HomeAssistant, entry: BoldConfigEntry) -> Iterator[Issue]:
+    """Door sensor links that no longer do anything."""
+    registry = er.async_get(hass)
+    devices = entry.runtime_data.devices.data
+    for subentry in entry.get_subentries_of_type(SUBENTRY_DOOR_SENSOR):
+        lock_id = subentry.data[CONF_LOCK]
+        placeholders = {"lock": title_lock_name(subentry.title)}
+        door = er.async_resolve_entity_id(registry, subentry.data[CONF_DOOR_SENSOR])
+        if door is None or (
+            # A sensor outside the registry has no state until its integration
+            # has set it up, which may be after Bold, until Home Assistant is
+            # running.
+            hass.state is CoreState.running
+            and registry.async_get(door) is None
+            and hass.states.get(door) is None
+        ):
+            yield (
+                f"door_sensor_missing_{lock_id}",
+                "door_sensor_missing",
+                placeholders,
+            )
+        elif (lock := devices.get(lock_id)) is not None and not lock.reports_bolt:
+            yield (
+                f"door_sensor_no_locked_status_{lock_id}",
+                "door_sensor_no_locked_status",
+                placeholders,
+            )
+
+
 @callback
 def async_check_issues(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
     """Raise issues for problems that have lasted a while, and clear fixed ones.
@@ -84,7 +134,9 @@ def async_check_issues(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
     locks = [device for device in devices if device.is_lock]
     active: set[str] = set()
     for issue_id, key, placeholders in chain(
-        _connect_issues(devices, locks, now), _lock_issues(data, locks, now)
+        _connect_issues(devices, locks, now),
+        _lock_issues(data, locks, now),
+        _link_issues(hass, entry),
     ):
         active.add(issue_id)
         ir.async_create_issue(
@@ -95,7 +147,7 @@ def async_check_issues(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
             severity=ir.IssueSeverity.WARNING,
             translation_key=key,
             translation_placeholders=placeholders,
-            learn_more_url=TROUBLESHOOTING_URL,
+            learn_more_url=LEARN_MORE_URLS.get(key, TROUBLESHOOTING_URL),
         )
 
     for domain, issue_id in list(ir.async_get(hass).issues):

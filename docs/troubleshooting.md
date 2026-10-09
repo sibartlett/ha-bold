@@ -7,7 +7,9 @@ Home Assistant tells you under **Settings → System → Repairs** when:
 - a Bold Connect has been offline for an hour;
 - a lock that can only be unlocked over Bluetooth has been out of range for an
   hour;
-- a lock can't be unlocked from Home Assistant at all.
+- a lock can't be unlocked from Home Assistant at all;
+- a lock's [linked door sensor](door-sensors.md) has been deleted, or the lock
+  has locked status turned off, so the link has no effect.
 
 Repairs clear themselves once the problem is gone. You can ignore one, such as
 for a lock that's only in range some of the time, and it comes back if the
