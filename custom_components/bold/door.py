@@ -21,6 +21,7 @@ from homeassistant.core import (
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
+ATTR_DOOR_SENSOR = "door_sensor"
 ATTR_DOOR_OPENED_AT = "door_opened_at"
 ATTR_DOOR_OPEN = "door_open"
 ATTR_DOOR_SEEN_AT = "door_seen_at"
@@ -29,9 +30,14 @@ ATTR_DOOR_SEEN_AT = "door_seen_at"
 class DoorSensor:
     """Follows a door's contact sensor, remembering when the door last opened."""
 
-    def __init__(self, entity_id: str) -> None:
-        """Initialize the door sensor."""
+    def __init__(self, entity_id: str, link_id: str) -> None:
+        """Initialize the door sensor.
+
+        link_id identifies the sensor as the link stores it, which stays the
+        same when its entity ID changes.
+        """
         self.entity_id = entity_id
+        self._link_id = link_id
         # When the door last opened, by Home Assistant's clock.
         self.opened_at: datetime | None = None
         # Whether the door was last seen open, ignoring an unavailable sensor.
@@ -49,7 +55,9 @@ class DoorSensor:
         Calls on_change when the sensor changes, and returns how to stop.
         """
         seen_at: datetime | None = None
-        if stored is not None:
+        # What was stored for another sensor, before the link was changed,
+        # says nothing about this door.
+        if stored is not None and stored.get(ATTR_DOOR_SENSOR) == self._link_id:
             self.opened_at = _stored_time(stored.get(ATTR_DOOR_OPENED_AT))
             seen_at = _stored_time(stored.get(ATTR_DOOR_SEEN_AT))
             if isinstance(open_ := stored.get(ATTR_DOOR_OPEN), bool):
@@ -77,6 +85,7 @@ class DoorSensor:
     def as_dict(self) -> dict[str, Any]:
         """Return what to remember across restarts: when it last opened, and how it was."""
         return {
+            ATTR_DOOR_SENSOR: self._link_id,
             ATTR_DOOR_OPENED_AT: self.opened_at.isoformat() if self.opened_at else None,
             ATTR_DOOR_OPEN: self._was_open,
             ATTR_DOOR_SEEN_AT: dt_util.utcnow().isoformat(),

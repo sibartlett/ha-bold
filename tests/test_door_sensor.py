@@ -192,6 +192,7 @@ async def test_opening_remembered(
     extra = data.last_states[LOCK_ENTITY].extra_data
     assert extra is not None
     assert extra.as_dict() == {
+        "door_sensor": DOOR,
         "door_opened_at": "2026-09-24T12:00:00+00:00",
         "door_open": False,
         "door_seen_at": "2026-09-24T12:00:00+00:00",
@@ -210,7 +211,7 @@ async def test_opening_restored(
         [
             (
                 State(LOCK_ENTITY, LockState.LOCKED),
-                {"door_opened_at": "2026-09-24T11:55:00+00:00"},
+                {"door_sensor": DOOR, "door_opened_at": "2026-09-24T11:55:00+00:00"},
             )
         ],
     )
@@ -218,6 +219,33 @@ async def test_opening_restored(
         hass, mock_config_entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY]
     )
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+async def test_other_sensors_opening_not_restored(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test what was stored for a sensor the link no longer uses is ignored."""
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(LOCK_ENTITY, LockState.LOCKED),
+                {
+                    "door_sensor": "binary_sensor.wrong_door",
+                    "door_opened_at": "2026-09-24T11:55:00+00:00",
+                    "door_open": True,
+                },
+            )
+        ],
+    )
+    await setup_integration(
+        hass, mock_config_entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY]
+    )
+    # The linked door, closed since before the 11:50 locked report.
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
 
 async def _restart_with(
@@ -248,6 +276,7 @@ async def test_restart_with_the_door_still_open(
         mock_config_entry,
         aioclient_mock,
         {
+            "door_sensor": DOOR,
             "door_opened_at": "2026-09-24T11:45:00+00:00",
             "door_open": True,
             "door_seen_at": "2026-09-24T11:58:00+00:00",
@@ -269,6 +298,7 @@ async def test_opened_while_restarting(
         mock_config_entry,
         aioclient_mock,
         {
+            "door_sensor": DOOR,
             "door_opened_at": "2026-09-24T11:40:00+00:00",
             "door_open": False,
             "door_seen_at": "2026-09-24T11:58:00+00:00",

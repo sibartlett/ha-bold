@@ -136,7 +136,7 @@ class BoldLock(BoldEntity, LockEntity, RestoreEntity):
                 er.async_get(self.hass), self._door_sensor
             )
         ):
-            self._door = DoorSensor(door_sensor)
+            self._door = DoorSensor(door_sensor, self._door_sensor)
             stored = await self.async_get_last_extra_data()
             self.async_on_remove(
                 self._door.async_start(
