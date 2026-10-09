@@ -292,6 +292,9 @@ class BoldEvent:
     method: str | None
     user_name: str | None
     remote_activation: bool
+    # Whether the Bold app activated it as a phone came near. Bold leaves this
+    # out for activations that can't be, such as by the button.
+    auto_activation: bool
     activation_time: timedelta | None
     keep_active_until: datetime | None
     bolt_locked: bool | None
@@ -333,6 +336,7 @@ class BoldEvent:
             # Remote activations name the Bold Connect they went through;
             # "remoteActivation" is documented but not always sent.
             remote_activation=_flag(data.get("remoteActivation")) or bool(connect),
+            auto_activation=_flag(data.get("autoActivation")),
             activation_time=parse_duration(data.get("activationTime")),
             keep_active_until=parse_datetime(data.get("keepActiveUntil")),
             bolt_locked=(

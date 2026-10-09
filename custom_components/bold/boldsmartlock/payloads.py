@@ -119,6 +119,7 @@ class EventPayload(ReadingsPayload, total=False):
     account: PersonPayload
     triggeredBy: PersonPayload
     remoteActivation: bool
+    autoActivation: bool
     connect: ReferencePayload
     activationTime: int | str
     keepActiveUntil: str

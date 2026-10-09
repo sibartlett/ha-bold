@@ -5,6 +5,8 @@
 - A lock with locked status on can be linked to its door's contact sensor,
   from the integration's page. It then shows as unlocked once the door has
   opened since it last reported locked, catching unlocks the lock missed.
+- An activation's activity says whether the Bold app activated the lock
+  automatically, as a phone came near, in its `automatic` attribute.
 
 ## 1.1.0 (2026-10-07)
 

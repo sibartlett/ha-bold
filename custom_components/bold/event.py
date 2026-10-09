@@ -94,6 +94,7 @@ class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
                 attributes["remote"] = event.remote_activation
             if event.type == BoldEventType.ACTIVATION:
                 attributes["result"] = event.result
+                attributes["automatic"] = event.auto_activation
             if event.type in TAMPER_EVENTS:
                 attributes["tamper_type"] = TAMPER_EVENTS[event.type]
             self._trigger_event(event_type, attributes)
