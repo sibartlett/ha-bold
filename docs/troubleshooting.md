@@ -1,11 +1,19 @@
 # Troubleshooting
 
-Home Assistant raises a repair (**Settings → System → Repairs**) when a Bold
-Connect has been offline for an hour, when a lock that can only be unlocked
-over Bluetooth has been out of range for an hour, or when a lock has no way to
-be unlocked from Home Assistant at all. Repairs clear themselves once the
-problem is gone. You can ignore one, e.g. for a lock that's only in range some
-of the time; it's raised again if the problem comes back after being fixed.
+## Repairs
+
+Home Assistant tells you under **Settings → System → Repairs** when:
+
+- a Bold Connect has been offline for an hour;
+- a lock that can only be unlocked over Bluetooth has been out of range for an
+  hour;
+- a lock can't be unlocked from Home Assistant at all.
+
+Repairs clear themselves once the problem is gone. You can ignore one, such as
+for a lock that's only in range some of the time, and it comes back if the
+problem returns after being fixed.
+
+## Common problems
 
 - **A lock is unavailable.** Home Assistant has no way to reach it: no Bold
   Connect it can use (none assigned in the Bold app, or Bold can't be
@@ -24,11 +32,11 @@ of the time; it's raised again if the problem comes back after being fixed.
 - **A lock has no activity entity.** The lock doesn't support Bold's event log.
   If the log says the account "is not allowed to read the event log", your Bold
   account doesn't have access to it.
-- **Activity takes up to 30 seconds to appear.** Bold isn't pushing it. Home
+- **Activity takes up to 30 seconds to appear.** Bold isn't pushing it: Home
   Assistant needs an external URL Bold can reach, or Home Assistant Cloud. The
-  integration's diagnostics show whether pushes are active, and when the last
-  one arrived; debug logging shows why the webhook couldn't be set up. After changing the external URL, reload the
-  integration so the webhook points at the new address.
+  integration's diagnostics show whether pushes are working and when the last
+  one arrived, and debug logging shows why the webhook couldn't be set up. If
+  you change the external URL, reload the integration so the webhook follows.
 - **The lock shows locked, but someone just opened it.** Locks that don't
   report their bolt position only show as unlocked while activated (usually a
   few seconds), which can be over before the activity arrives.
@@ -69,10 +77,12 @@ of the time; it's raised again if the problem comes back after being fixed.
 
 ## Reporting a problem
 
-When reporting a problem, include the integration's diagnostics
-(**Settings → Devices & services → Bold Smart Lock → ⋮ → Download diagnostics**)
-and debug logs (**⋮ → Enable debug logging**, reproduce the problem, then
-disable it to download the log). Personal details are removed from diagnostics.
+Please include:
+
+- **Diagnostics:** **Settings → Devices & services → Bold Smart Lock → ⋮ →
+  Download diagnostics**. Personal details are removed.
+- **Debug logs:** **⋮ → Enable debug logging**, reproduce the problem, then
+  disable it to download the log.
 
 ## Removal
 
