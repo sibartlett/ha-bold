@@ -3,12 +3,11 @@
 from homeassistant.components.event import EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .boldsmartlock import BoldDevice, BoldEvent, BoldEventType
-from .coordinator import BoldConfigEntry, BoldEventCoordinator
-from .entity import async_add_device_entities, device_info
+from .coordinator import BoldConfigEntry, BoldRuntimeData
+from .entity import BoldEventEntity, async_add_device_entities
 
 PARALLEL_UPDATES = 0
 
@@ -32,13 +31,11 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Bold activity events."""
-    events = entry.runtime_data.events
+    data = entry.runtime_data
     async_add_device_entities(
         entry,
         async_add_entities,
-        lambda device: (
-            [BoldActivityEvent(events, device)] if device.has_activity else []
-        ),
+        lambda device: [BoldActivityEvent(data, device)] if device.has_activity else [],
     )
 
 
@@ -55,10 +52,9 @@ def _event_type(event: BoldEvent) -> str | None:
     return None
 
 
-class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
+class BoldActivityEvent(BoldEventEntity, EventEntity):
     """Activity on a Bold lock, from its event log."""
 
-    _attr_has_entity_name = True
     _attr_translation_key = "activity"
     _attr_event_types = [
         EVENT_ACTIVATED,
@@ -69,12 +65,9 @@ class BoldActivityEvent(CoordinatorEntity[BoldEventCoordinator], EventEntity):
         EVENT_UNLOCKED,
     ]
 
-    def __init__(self, coordinator: BoldEventCoordinator, device: BoldDevice) -> None:
+    def __init__(self, data: BoldRuntimeData, device: BoldDevice) -> None:
         """Initialize the entity."""
-        super().__init__(coordinator)
-        self.device_id = device.id
-        self._attr_unique_id = f"{device.id}_activity"
-        self._attr_device_info = device_info(device)
+        super().__init__(data, device, "activity")
 
     @callback
     def _handle_coordinator_update(self) -> None:

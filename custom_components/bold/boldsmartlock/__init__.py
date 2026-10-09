@@ -31,7 +31,14 @@ from .exceptions import (
     BoldGatewayNotFoundError,
     BoldRateLimitError,
 )
-from .models import BoldDevice, BoldEvent, BoldEventType, parse_datetime, parse_duration
+from .models import (
+    BoldDevice,
+    BoldEvent,
+    BoldEventType,
+    EventKey,
+    parse_datetime,
+    parse_duration,
+)
 from .payloads import (
     AccountPayload,
     CommandPayload,
@@ -71,6 +78,7 @@ __all__ = [
     "CommandPayload",
     "CommandResponsePayload",
     "DevicePayload",
+    "EventKey",
     "EventPayload",
     "HandshakePayload",
     "WebhookPayload",

@@ -20,7 +20,12 @@ from .boldsmartlock import (
     BoldRateLimitError,
 )
 from .const import DOMAIN, MANUFACTURER
-from .coordinator import BoldConfigEntry, BoldDeviceCoordinator
+from .coordinator import (
+    BoldConfigEntry,
+    BoldDeviceCoordinator,
+    BoldEventCoordinator,
+    BoldRuntimeData,
+)
 
 
 @callback
@@ -76,6 +81,19 @@ def device_info(device: BoldDevice, via_device_id: str | None = None) -> DeviceI
     return info
 
 
+def _entity_device_info(
+    devices: BoldDeviceCoordinator, device: BoldDevice
+) -> DeviceInfo:
+    """Return an entity's device info, linking a lock to its Bold Connect."""
+    # A Connect reports itself as its own gateway.
+    via_device_id = (
+        devices.connect_device_ids.get(device.gateway_id)
+        if device.gateway_id != device.id
+        else None
+    )
+    return device_info(device, via_device_id)
+
+
 class BoldEntity(CoordinatorEntity[BoldDeviceCoordinator]):
     """An entity of a Bold device."""
 
@@ -88,13 +106,7 @@ class BoldEntity(CoordinatorEntity[BoldDeviceCoordinator]):
         super().__init__(coordinator)
         self.device_id = device.id
         self._attr_unique_id = f"{device.id}_{key}" if key else str(device.id)
-        # A Connect reports itself as its own gateway.
-        via_device_id = (
-            coordinator.connect_device_ids.get(device.gateway_id)
-            if device.gateway_id != device.id
-            else None
-        )
-        self._attr_device_info = device_info(device, via_device_id)
+        self._attr_device_info = _entity_device_info(coordinator, device)
 
     @property
     def device(self) -> BoldDevice:
@@ -105,6 +117,19 @@ class BoldEntity(CoordinatorEntity[BoldDeviceCoordinator]):
     def available(self) -> bool:
         """Return whether the device is still known to the account."""
         return super().available and self.device_id in self.coordinator.data
+
+
+class BoldEventEntity(CoordinatorEntity[BoldEventCoordinator]):
+    """An entity of a Bold device, updated from its event log."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, data: BoldRuntimeData, device: BoldDevice, key: str) -> None:
+        """Initialize the entity."""
+        super().__init__(data.events)
+        self.device_id = device.id
+        self._attr_unique_id = f"{device.id}_{key}"
+        self._attr_device_info = _entity_device_info(data.devices, device)
 
 
 def command_error(err: BoldError) -> HomeAssistantError:

@@ -277,6 +277,11 @@ class BoldDevice:
         return self.actual_firmware_version < self.required_firmware_version
 
 
+# Identifies an event, whether it was polled or pushed: its type, device,
+# time to the second, and bolt position.
+type EventKey = tuple[str, int | None, datetime, bool | None]
+
+
 @dataclass(frozen=True)
 class BoldEvent:
     """An event, from GET /v2/events or pushed to a webhook.
@@ -359,7 +364,7 @@ class BoldEvent:
         )
 
     @property
-    def key(self) -> tuple[str, int | None, datetime, bool | None]:
+    def key(self) -> EventKey:
         """Identify the event, whether it was polled or pushed."""
         return (
             self.type,
