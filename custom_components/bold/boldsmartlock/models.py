@@ -295,6 +295,9 @@ class BoldEvent:
     # Whether the Bold app activated it as a phone came near. Bold leaves this
     # out for activations that can't be, such as by the button.
     auto_activation: bool
+    # The app that sent it, e.g. "BoldApp" or "HomeAssistant"; None for the
+    # lock's button or keypad.
+    client: str | None
     activation_time: timedelta | None
     keep_active_until: datetime | None
     bolt_locked: bool | None
@@ -337,6 +340,7 @@ class BoldEvent:
             # "remoteActivation" is documented but not always sent.
             remote_activation=_flag(data.get("remoteActivation")) or bool(connect),
             auto_activation=_flag(data.get("autoActivation")),
+            client=_str(data.get("clientId")),
             activation_time=parse_duration(data.get("activationTime")),
             keep_active_until=parse_datetime(data.get("keepActiveUntil")),
             bolt_locked=(

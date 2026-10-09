@@ -73,6 +73,8 @@ async def test_activation_event(
     assert state.attributes["remote"] is False
     # Bold only says whether an activation was automatic when it could be.
     assert state.attributes["automatic"] is False
+    # A PIN is entered at the lock, with no app.
+    assert state.attributes["client"] is None
     assert state.attributes["time"] == "2026-09-24T12:00:10+00:00"
     # Pushed events have no ID, so none is exposed.
     assert "bold_event_id" not in state.attributes
@@ -100,7 +102,9 @@ async def test_automatic_activation(
     )
     set_events(mock_api, [event])
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
-    assert hass.states.get(ENTITY_ID).attributes["automatic"] is True
+    state = hass.states.get(ENTITY_ID)
+    assert state.attributes["automatic"] is True
+    assert state.attributes["client"] == "BoldApp"
 
 
 async def test_event_from_a_clock_ahead(

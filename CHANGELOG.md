@@ -7,6 +7,8 @@
   opened since it last reported locked, catching unlocks the lock missed.
 - An activation's activity says whether the Bold app activated the lock
   automatically, as a phone came near, in its `automatic` attribute.
+- An activation's or deactivation's activity names the app that sent it, such
+  as the Bold app or Home Assistant, in its `client` attribute.
 
 ## 1.1.0 (2026-10-07)
 

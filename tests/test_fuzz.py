@@ -61,6 +61,7 @@ KEYS = [
     "emailAddress",
     "remoteActivation",
     "autoActivation",
+    "clientId",
     "connect",
     "activationTime",
     "keepActiveUntil",
