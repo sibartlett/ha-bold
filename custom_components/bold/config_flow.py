@@ -13,7 +13,6 @@ from homeassistant.config_entries import (
     ConfigSubentryFlow,
     SubentryFlowResult,
 )
-from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.helpers import config_entry_oauth2_flow, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -28,11 +27,7 @@ import voluptuous as vol
 
 from .boldsmartlock import BoldClient, BoldError
 from .const import CONF_DOOR_SENSOR, CONF_LOCK, DOMAIN, SUBENTRY_DOOR_SENSOR
-
-# A link's title: the lock, then its door sensor.
-TITLE_LOCK = "🔒 "
-TITLE_ARROW = " → "
-TITLE_DOOR = "🚪 "
+from .links import link_title, lock_entity_id, title_lock_name
 
 # The contact sensors a door can have.
 DOOR_SENSOR_SELECTOR = EntitySelector(
@@ -211,8 +206,7 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
         """Choose a different door sensor for the lock."""
         subentry = self._get_reconfigure_subentry()
         lock_name = self._lock_name(
-            subentry.data[CONF_LOCK],
-            subentry.title.partition(TITLE_ARROW)[0].removeprefix(TITLE_LOCK),
+            subentry.data[CONF_LOCK], title_lock_name(subentry.title)
         )
         if user_input is not None:
             return self.async_update_and_abort(
@@ -247,10 +241,9 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
 
     def _lock_name(self, device_id: int, fallback: str) -> str:
         """Return the lock's name in Home Assistant, like its door sensor's."""
-        entity_id = er.async_get(self.hass).async_get_entity_id(
-            Platform.LOCK, DOMAIN, str(device_id)
-        )
-        if entity_id and (state := self.hass.states.get(entity_id)):
+        if (entity_id := lock_entity_id(self.hass, device_id)) and (
+            state := self.hass.states.get(entity_id)
+        ):
             return state.name
         return fallback
 
@@ -258,4 +251,4 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
         """Return a link's title, showing the lock and its door sensor's name."""
         state = self.hass.states.get(door_sensor)
         door_name = state.name if state else door_sensor
-        return f"{TITLE_LOCK}{lock_name}{TITLE_ARROW}{TITLE_DOOR}{door_name}"
+        return link_title(lock_name, door_name)

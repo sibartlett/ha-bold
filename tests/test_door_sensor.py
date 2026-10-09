@@ -13,7 +13,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, State
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -26,6 +26,7 @@ from custom_components.bold.boldsmartlock.const import API_URL
 from custom_components.bold.const import (
     CONF_DOOR_SENSOR,
     CONF_LOCK,
+    DOMAIN,
     EVENT_SCAN_INTERVAL,
     SUBENTRY_DOOR_SENSOR,
 )
@@ -481,6 +482,72 @@ async def test_sensor_entity_id_renamed(
     # Diagnostics show it by its entity ID.
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
     assert diagnostics["door_sensors"] == {LOCK_ID: renamed}
+
+
+async def test_titles_follow_renames(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    device_registry: dr.DeviceRegistry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test a link's title follows its lock and door sensor being renamed."""
+    entry = MockConfigEntry(
+        domain=mock_config_entry.domain,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
+        subentries_data=[
+            ConfigSubentryData(
+                data={CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: DOOR},
+                subentry_type=SUBENTRY_DOOR_SENSOR,
+                # Renamed while Home Assistant wasn't running.
+                title="🔒 Old lock → 🚪 Old door",
+                unique_id=str(LOCK_ID),
+            )
+        ],
+    )
+    await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
+    (subentry_id,) = entry.subentries
+
+    def title() -> str:
+        return entry.subentries[subentry_id].title
+
+    assert title() == "🔒 Front Door → 🚪 Front Door contact"
+
+    with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+        # The lock takes its device's name, unless it has its own.
+        device = device_registry.async_get_device_by_identifier(
+            (DOMAIN, str(LOCK_ID)), entry.entry_id
+        )
+        assert device is not None
+        device_registry.async_update_device(device.id, name_by_user="Front entrance")
+        await hass.async_block_till_done()
+        assert title() == "🔒 Front entrance → 🚪 Front Door contact"
+        entity_registry.async_update_entity(LOCK_ENTITY, name="Front lock")
+        await hass.async_block_till_done()
+        assert title() == "🔒 Front lock → 🚪 Front Door contact"
+        hass.states.async_set(DOOR, STATE_OFF, {"friendly_name": "Front door"})
+        await hass.async_block_till_done()
+        assert title() == "🔒 Front lock → 🚪 Front door"
+        # The door opening, or its sensor going away, leaves the title.
+        hass.states.async_set(DOOR, STATE_ON, {"friendly_name": "Front door"})
+        await hass.async_block_till_done()
+        hass.states.async_remove(DOOR)
+        await hass.async_block_till_done()
+        assert title() == "🔒 Front lock → 🚪 Front door"
+    reload.assert_not_called()
+
+    # A changed entity ID reloads, to keep following it.
+    hass.states.async_set(DOOR, STATE_OFF, {"friendly_name": "Front door"})
+    entity_registry.async_update_entity(
+        LOCK_ENTITY, new_entity_id="lock.front_door_lock"
+    )
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    entity_registry.async_update_entity("lock.front_door_lock", name="Back lock")
+    await hass.async_block_till_done()
+    assert title() == "🔒 Back lock → 🚪 Front door"
 
 
 async def test_sensor_deleted(

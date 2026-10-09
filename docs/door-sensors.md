@@ -12,7 +12,8 @@ the door has a contact sensor, linking the two catches this.
    opening device class.
 
 Each link is listed there as a **Linked door sensor**, such as
-"🔒 Front Door → 🚪 Front Door", where you can change or delete it.
+"🔒 Front Door → 🚪 Front Door", where you can change or delete it. Its title
+follows the lock and sensor as you rename them.
 
 Only locks with locked status on can be linked. For other locks, locked and
 unlocked mean whether they're activated, which the door doesn't change.
