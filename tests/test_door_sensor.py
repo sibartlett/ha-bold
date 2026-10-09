@@ -13,6 +13,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, State
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -363,28 +364,34 @@ async def test_link_reconfigure_and_unlink(
     assert entry.state is ConfigEntryState.LOADED
 
 
-async def test_reconfigure_renamed_lock(
+async def test_lock_named_as_in_home_assistant(
     hass: HomeAssistant,
     setup_credentials: None,
     aioclient_mock: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
 ) -> None:
-    """Test changing a link uses the lock's name in Bold, or else as linked."""
+    """Test a link names the lock as Home Assistant does, like its door sensor."""
     entry = MockConfigEntry(
         domain=mock_config_entry.domain,
         unique_id=mock_config_entry.unique_id,
         data=mock_config_entry.data,
-        subentries_data=[
-            ConfigSubentryData(
-                data={CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: DOOR},
-                subentry_type=SUBENTRY_DOOR_SENSOR,
-                # Since renamed in the Bold app; names can contain the arrow.
-                title="🔒 Old → Name → 🚪 Front Door contact",
-                unique_id=str(LOCK_ID),
-            )
-        ],
     )
     await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
+    entity_registry.async_update_entity(LOCK_ENTITY, name="Front → Door")
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_DOOR_SENSOR), context={"source": SOURCE_USER}
+    )
+    assert result["data_schema"].schema[CONF_LOCK].config["options"] == [
+        {"value": str(LOCK_ID), "label": "Front → Door"}
+    ]
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {CONF_LOCK: str(LOCK_ID), CONF_DOOR_SENSOR: DOOR}
+    )
+    assert result["title"] == "🔒 Front → Door → 🚪 Front Door contact"
+    await hass.async_block_till_done()
     subentry_id = next(iter(entry.subentries))
 
     async def reconfigure() -> str:
@@ -392,7 +399,6 @@ async def test_reconfigure_renamed_lock(
             (entry.entry_id, SUBENTRY_DOOR_SENSOR),
             context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry_id},
         )
-        assert result["type"] is FlowResultType.FORM
         lock_name: str = result["description_placeholders"]["lock"]
         result = await hass.config_entries.subentries.async_configure(
             result["flow_id"], {CONF_DOOR_SENSOR: DOOR}
@@ -401,16 +407,15 @@ async def test_reconfigure_renamed_lock(
         await hass.async_block_till_done()
         return lock_name
 
-    assert await reconfigure() == "Front Door"
-    assert entry.subentries[subentry_id].title == (
-        "🔒 Front Door → 🚪 Front Door contact"
-    )
+    # Renamed since it was linked.
+    entity_registry.async_update_entity(LOCK_ENTITY, name="Back Door")
+    await hass.async_block_till_done()
+    assert await reconfigure() == "Back Door"
+    assert entry.subentries[subentry_id].title == "🔒 Back Door → 🚪 Front Door contact"
 
-    # Not loaded: as it was when linked.
-    hass.config_entries.async_update_subentry(
-        entry, entry.subentries[subentry_id], title="🔒 Back Door → 🚪 Door"
-    )
+    # Without a state, e.g. disabled: as it was named when linked.
     assert await hass.config_entries.async_unload(entry.entry_id)
+    hass.states.async_remove(LOCK_ENTITY)
     assert await reconfigure() == "Back Door"
 
 
