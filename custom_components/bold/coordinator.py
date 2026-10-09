@@ -19,6 +19,7 @@ from .boldsmartlock import (
     BoldEvent,
     BoldEventType,
     BoldForbiddenError,
+    EventKey,
 )
 from .const import (
     CONF_DOOR_SENSOR,
@@ -67,6 +68,19 @@ def door_sensors(entry: ConfigEntry) -> dict[int, str]:
     }
 
 
+def _update_error(err: BoldError) -> ConfigEntryAuthFailed | UpdateFailed:
+    """Translate an API error from a poll."""
+    if isinstance(err, BoldAuthError):
+        return ConfigEntryAuthFailed(
+            translation_domain=DOMAIN, translation_key="auth_failed"
+        )
+    return UpdateFailed(
+        translation_domain=DOMAIN,
+        translation_key="update_failed",
+        translation_placeholders={"error": str(err)},
+    )
+
+
 class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):
     """Polls the devices of a Bold account."""
 
@@ -91,16 +105,8 @@ class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):
         """Fetch all devices."""
         try:
             devices = await self.client.get_devices()
-        except BoldAuthError as err:
-            raise ConfigEntryAuthFailed(
-                translation_domain=DOMAIN, translation_key="auth_failed"
-            ) from err
         except BoldError as err:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="update_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
+            raise _update_error(err) from err
         return {device.id: device for device in devices}
 
 
@@ -142,7 +148,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
         self.status_history: list[BoldEvent] = []
         self._cursor: datetime | None = None
         # Seen events, by BoldEvent.key.
-        self._seen: dict[tuple[str, int | None, datetime, bool | None], datetime] = {}
+        self._seen: dict[EventKey, datetime] = {}
         self._primed: set[int] = set()
         self._last_catch_up: datetime | None = None
         self.push_active = False
@@ -180,10 +186,6 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
             since = min(since, now - EVENT_CATCH_UP_LOOKBACK)
         try:
             events = await self.client.get_events(device_ids, since)
-        except BoldAuthError as err:
-            raise ConfigEntryAuthFailed(
-                translation_domain=DOMAIN, translation_key="auth_failed"
-            ) from err
         except BoldForbiddenError:
             _LOGGER.warning(
                 "This Bold account is not allowed to read the event log; "
@@ -192,11 +194,7 @@ class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):
             self.update_interval = None
             return []
         except BoldError as err:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="update_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
+            raise _update_error(err) from err
 
         new_events = self._accept(events, now)
         if catch_up:

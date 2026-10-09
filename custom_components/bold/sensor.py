@@ -19,11 +19,10 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .boldsmartlock import BoldDevice, BoldEvent
-from .coordinator import BoldConfigEntry, BoldEventCoordinator, BoldRuntimeData
-from .entity import BoldEntity, async_add_device_entities, device_info
+from .coordinator import BoldConfigEntry, BoldRuntimeData
+from .entity import BoldEntity, BoldEventEntity, async_add_device_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ async def async_setup_entry(
             entities.append(BoldBluetoothSignalSensor(data, device))
         if device.is_lock and device.event_log:
             entities.extend(
-                BoldReportedSensor(data.events, device, description)
+                BoldReportedSensor(data, device, description)
                 for description in REPORTED_SENSORS
             )
         if device.is_lock:
@@ -232,27 +231,23 @@ REPORTED_SENSORS: tuple[BoldReportedSensorDescription, ...] = (
 )
 
 
-class BoldReportedSensor(CoordinatorEntity[BoldEventCoordinator], RestoreSensor):
+class BoldReportedSensor(BoldEventEntity, RestoreSensor):
     """A value a Bold lock reports in its event log, e.g. in its daily status.
 
     Readings are infrequent, so the last one is kept across restarts.
     """
 
-    _attr_has_entity_name = True
     entity_description: BoldReportedSensorDescription
 
     def __init__(
         self,
-        coordinator: BoldEventCoordinator,
+        data: BoldRuntimeData,
         device: BoldDevice,
         description: BoldReportedSensorDescription,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator)
+        super().__init__(data, device, description.key)
         self.entity_description = description
-        self.device_id = device.id
-        self._attr_unique_id = f"{device.id}_{description.key}"
-        self._attr_device_info = device_info(device)
 
     async def async_added_to_hass(self) -> None:
         """Restore the last reading, and pick up any from recent events."""
