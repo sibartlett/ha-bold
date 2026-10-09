@@ -32,6 +32,17 @@ of the time; it's raised again if the problem comes back after being fixed.
 - **The lock shows locked, but someone just opened it.** Locks that don't
   report their bolt position only show as unlocked while activated (usually a
   few seconds), which can be over before the activity arrives.
+- **The lock shows locked, but the door is unlocked.** The lock missed being
+  unlocked: two locked reports in a row in its activity show it. Linking the
+  lock to its [door sensor](door-sensors.md) shows it as unlocked as soon as
+  the door opens.
+- **The lock shows unlocked, but it was just locked.** The lock is holding the
+  report until it next checks in with its Bold Connect, up to about 15
+  minutes, or it missed being turned. It shows locked once it reports it, or
+  the next time it's turned.
+- **An automation runs after a restart.** Activity entities come back with
+  their last event: ignore changes from `unavailable` or `unknown`, as the
+  [examples](automations.md#examples) do.
 - **Home Assistant asks to re-authenticate.** Your Bold sign-in expired or was
   revoked. Follow the prompt and sign in with the same Bold account.
 
