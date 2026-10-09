@@ -46,6 +46,29 @@ of the time; it's raised again if the problem comes back after being fixed.
 - **Home Assistant asks to re-authenticate.** Your Bold sign-in expired or was
   revoked. Follow the prompt and sign in with the same Bold account.
 
+## Known limitations
+
+- **Bold locks aren't motorised.** Unlocking lets someone turn the lock by
+  hand for a few seconds, and **Lock** just ends that early. Nothing can turn
+  the bolt for you.
+- **Whether a door is locked** needs a Bold Elite or an upgraded Bold
+  Classic, with locked status turned on in the Bold app. Other locks show as
+  unlocked only while they're activated.
+- **Locks occasionally miss being turned**, and keep showing their last
+  position. [Linking a door sensor](door-sensors.md) catches a missed unlock
+  as soon as the door opens.
+- **Some updates arrive late.** A lock sometimes holds back a lock or unlock
+  until it next checks in with its Bold Connect, up to about 15 minutes.
+  Activity from outside Home Assistant usually arrives within seconds, or
+  within about 30 seconds when Bold can't reach Home Assistant. A Bold
+  Connect going offline is noticed after 30–40 minutes.
+- **Locks without a Bold Connect** only report activity when a phone with the
+  Bold app passes by.
+- **Battery levels** are Bold's five levels, from Excellent to Critical, not
+  percentages.
+
+## Reporting a problem
+
 When reporting a problem, include the integration's diagnostics
 (**Settings → Devices & services → Bold Smart Lock → ⋮ → Download diagnostics**)
 and debug logs (**⋮ → Enable debug logging**, reproduce the problem, then

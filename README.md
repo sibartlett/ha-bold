@@ -1,132 +1,119 @@
 # Bold Smart Lock for Home Assistant
 
-A Home Assistant integration for [Bold Smart Locks](https://boldsmartlock.com):
-smart cylinders that replace a door's regular cylinder, and are opened with the
-Bold app, a PIN, a key fob or remotely through a Bold Connect.
+Bring your [Bold Smart Locks](https://boldsmartlock.com) into Home Assistant.
+Unlock your doors from a dashboard, an automation or your voice assistant, see
+who came and went, and get a heads-up before a battery runs out.
 
-The integration connects to your Bold account through the
-[Bold API](https://apidoc.boldsmartlock.com/). It lets you unlock your locks
-remotely, see who opened them and how, and keep an eye on batteries, signal and
-firmware.
+## What you can do
+
+- **Unlock from anywhere**, through a Bold Connect, or **directly over
+  Bluetooth** when Home Assistant is in range, through its own adapter or an
+  [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html)
+  near the door. Bluetooth is faster and keeps working when the internet is
+  down.
+- **See who opened the door, and how**: the app, a PIN, the button or a key
+  fob, usually within seconds.
+- **Know whether a door is locked**, with a Bold Elite or an upgraded Bold
+  Classic.
+- **Get alerts** for wrong PINs, tamper warnings, low batteries, or a Bold
+  Connect going offline.
+- **Open a gate or garage door** wired to a Bold Connect.
 
 ## Supported devices
 
 | Device | Support |
 |---|---|
-| Bold Smart Cylinder | ✅ Tested with the Bold Classic, with and without the Classic Upgrade (which lets it report whether it's locked). The Bold Elite should be supported, but has not been tested. |
-| Bold Connect | ✅ Unlocks locks from anywhere, through Bold's cloud. A Connect with its **Controller** setting on can also open what its relay is wired to, such as a building's entrance, a gate or a garage door. |
-| Bold Clicker (key fob) | ➖ Ignored. Its activity shows up on the lock it opens. |
+| Bold Smart Cylinder | ✅ Tested with the Bold Classic, with and without the Classic Upgrade. The Bold Elite should work too, but hasn't been tested. |
+| Bold Connect | ✅ Unlocks your locks remotely. With its **Controller** setting on, it can also open a door, gate or garage door wired to it. |
+| Bold Clicker (key fob) | ➖ Not added as a device, but whenever it opens a lock, that shows in the lock's activity. |
 
-Home Assistant can unlock a lock in two ways:
+## Getting started
 
-- **Through a Bold Connect** near the lock, via Bold's cloud.
-- **Over Bluetooth**, directly, when Home Assistant can hear the lock: through
-  its own Bluetooth adapter, or an
-  [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html)
-  near the door. This is faster, works when the internet is down, and works for
-  locks without a Bold Connect.
-
-## Installation
-
-Requires Home Assistant 2026.8 or later.
+You'll need Home Assistant 2026.8 or later.
 
 1. In HACS, add `https://github.com/sibartlett/ha-bold` as a custom repository
    (type: Integration), then download **Bold Smart Lock**.
 2. Restart Home Assistant.
 3. Go to **Settings → Devices & services → Add integration**, choose
-   **Bold Smart Lock** and sign in with your Bold account.
+   **Bold Smart Lock**, and sign in with your Bold account.
 
-Signing in needs one of:
+To sign in, you'll use either:
 
-- **Home Assistant Cloud:** if you're logged in to Home Assistant Cloud, pick it
-  when asked how to sign in. There's nothing else to configure.
-- **Your own Bold OAuth client:** Bold issues custom clients free of charge
-  ([request one](https://sesamsolutions.gitlab.io/public-documentation/integration/oauth-authentication.html)),
-  with `https://my.home-assistant.io/redirect/oauth` as the redirect URI. Add its
-  client ID and secret under
-  **Settings → Devices & services → ⋮ → Application credentials** before adding
-  the integration.
+- **Home Assistant Cloud**, if you're subscribed: just pick it when asked.
+- **Your own Bold OAuth client**, which Bold issues for free
+  ([request one](https://sesamsolutions.gitlab.io/public-documentation/integration/oauth-authentication.html)).
+  Use `https://my.home-assistant.io/redirect/oauth` as the redirect URI, and
+  add the client ID and secret under
+  **Settings → Devices & services → ⋮ → Application credentials** first.
 
-There are no other settings. Each Bold account can be added once.
+That's it: your locks and Bold Connects appear automatically. Home Assistant
+may also offer to set Bold up for you, under
+**Settings → Devices & services → Discovered**, when it hears a Bold lock or
+sees a Bold Connect.
 
-For activity to appear within seconds, Bold needs to reach Home Assistant from
-the internet: set an external URL (**Settings → System → Network**), or use
-Home Assistant Cloud. Without that, activity is polled instead (see
-[How data is updated](https://github.com/sibartlett/ha-bold/blob/main/docs/how-it-works.md)).
+**Tip:** for activity to show up within seconds, Bold needs to reach your Home
+Assistant: use Home Assistant Cloud, or set an external URL under
+**Settings → System → Network**. Otherwise it's checked every 30 seconds.
 
-If Home Assistant can hear a Bold lock over Bluetooth, or sees a Bold Connect
-join your network, it offers to set up Bold under
-**Settings → Devices & services → Discovered**.
+### Coming from the older Bold integration?
 
-### Switching from the older Bold integration
+This one replaces
+[lwestenberg/homeassistant_bold](https://github.com/lwestenberg/homeassistant_bold),
+and the two can't be installed together. Delete the old one under
+**Settings → Devices & services**, remove it in HACS and restart, then set this
+one up as above. Your entity IDs may change, so check your automations and
+dashboards afterwards.
 
-This integration replaces the older one
-([lwestenberg/homeassistant_bold](https://github.com/lwestenberg/homeassistant_bold)),
-and uses the same `bold` domain, so the two can't be installed together:
+## What you get
 
-1. Delete the old integration under **Settings → Devices & services → Bold**.
-2. Remove it in HACS, and restart Home Assistant.
-3. Install this one as above, and add it again.
+Each lock gets a **lock** to unlock it, an **activity** event showing who
+opened it and how, **battery** and **signal** sensors, and a **firmware**
+update entity. With Bluetooth, you can also choose how each lock is unlocked:
+through its Bold Connect or over Bluetooth, with the other as a fallback. Each
+Bold Connect gets a **connectivity** sensor and a **firmware** update entity.
 
-Entity IDs may differ, so check automations and dashboards that used the old
-ones.
+Two optional extras:
 
-## Entities
+- [**Link a lock to its door sensor**](https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md)
+  for a more reliable lock status.
+- [**Use a Bold Connect as a door, gate or garage opener**](https://github.com/sibartlett/ha-bold/blob/main/docs/controller.md)
+  with its Controller setting on.
 
-Each lock gets a `lock` to unlock it, an `event` for its activity (who opened
-it, and how), sensors for its battery and signal, and a firmware `update`.
-With Bluetooth, a `select` chooses whether it's unlocked through its Bold
-Connect or over Bluetooth. Each Bold Connect gets a connectivity sensor and a
-firmware `update`. See [Entities](https://github.com/sibartlett/ha-bold/blob/main/docs/entities.md) for the details.
+## Good to know
 
-- [Link a lock to its door sensor](https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md), for a
-  more reliable lock status.
-- [A Bold Connect with its Controller setting on](https://github.com/sibartlett/ha-bold/blob/main/docs/controller.md)
-  can open a door, gate or garage door.
+- **Bold locks aren't motorised.** Unlocking lets someone turn the lock by
+  hand for a few seconds, and **Lock** just ends that early. Nothing can turn
+  the bolt for you.
+- **Whether a door is locked** needs a Bold Elite or an upgraded Bold
+  Classic, with locked status turned on in the Bold app. Other locks show as
+  unlocked only while they're activated.
+- **Locks without a Bold Connect** only report activity when a phone with the
+  Bold app passes by.
 
-## Known limitations
+See all the [known limitations](https://github.com/sibartlett/ha-bold/blob/main/docs/troubleshooting.md#known-limitations).
 
-- **Bolt position needs the Classic Upgrade** (or a lock that reports it),
-  with locked status on. Other locks' state shows whether they're
-  _activated_, not whether the bolt is thrown, as an assumed state, as does
-  any lock with locked status turned off in the Bold app.
-  Bolt changes usually appear within seconds with pushes, or about 30 seconds
-  without.
-- **A lock sometimes misses being turned**, and keeps showing its last
-  position until it's next turned: locked while the door is unlocked, for
-  example. [Link it to its door sensor](https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md)
-  to catch the unlocks it misses.
-- **A lock sometimes holds a bolt change back** until it next checks in with
-  its Bold Connect, up to about 15 minutes later.
-- **Lock can't throw the bolt.** Bold locks are turned by hand; **Lock** only
-  ends an activation early.
-- **Delays.** Activity from outside Home Assistant (app, PIN, button, key fob)
-  appears within seconds when Bold can push it, and within about 30 seconds
-  otherwise. A Bold Connect going offline is noticed
-  after 30–40 minutes.
-- **Locks without a Bold Connect** only report activity to Bold (and so to
-  Home Assistant) when a phone with the Bold app passes by.
-- **Battery levels** are the five levels Bold reports, not percentages.
+## Learn more
 
-## Documentation
-
-- [Entities](https://github.com/sibartlett/ha-bold/blob/main/docs/entities.md)
+- [Entities and their attributes](https://github.com/sibartlett/ha-bold/blob/main/docs/entities.md)
 - [Linking a lock to its door sensor](https://github.com/sibartlett/ha-bold/blob/main/docs/door-sensors.md)
-- [A Bold Connect with its Controller setting on](https://github.com/sibartlett/ha-bold/blob/main/docs/controller.md)
-- [How data is updated](https://github.com/sibartlett/ha-bold/blob/main/docs/how-it-works.md)
-- [Automations](https://github.com/sibartlett/ha-bold/blob/main/docs/automations.md)
-- [Troubleshooting and removal](https://github.com/sibartlett/ha-bold/blob/main/docs/troubleshooting.md)
+- [Using a Bold Connect as a door, gate or garage opener](https://github.com/sibartlett/ha-bold/blob/main/docs/controller.md)
+- [Automation ideas and examples](https://github.com/sibartlett/ha-bold/blob/main/docs/automations.md)
+- [How updates reach Home Assistant](https://github.com/sibartlett/ha-bold/blob/main/docs/how-it-works.md)
+- [Troubleshooting, known limitations and removal](https://github.com/sibartlett/ha-bold/blob/main/docs/troubleshooting.md)
 - [Contributing](https://github.com/sibartlett/ha-bold/blob/main/CONTRIBUTING.md)
 
 ## Security
 
-The integration stores Bluetooth keys that can unlock your locks: see
+To unlock over Bluetooth, the integration stores keys for your locks in Home
+Assistant, so keep your backups safe. See
 [where the keys are kept](https://github.com/sibartlett/ha-bold/blob/main/docs/how-it-works.md#where-the-keys-are-kept).
-To report a security problem, see [SECURITY.md](https://github.com/sibartlett/ha-bold/blob/main/SECURITY.md).
+To report a security issue, see
+[SECURITY.md](https://github.com/sibartlett/ha-bold/blob/main/SECURITY.md).
 
 ## License
 
-The code is licensed under the [Apache License 2.0](https://github.com/sibartlett/ha-bold/blob/main/LICENSE). The Bluetooth
-protocol is ported from
-[homebridge-bold-ble](https://github.com/robbertkl/homebridge-bold-ble) (MIT). The Bold name and
-logos are trademarks of Bold Smart Lock.
+Apache License 2.0: see
+[LICENSE](https://github.com/sibartlett/ha-bold/blob/main/LICENSE). The
+Bluetooth protocol is ported from
+[homebridge-bold-ble](https://github.com/robbertkl/homebridge-bold-ble) (MIT).
+Bold and its logos are trademarks of Bold Smart Lock.
