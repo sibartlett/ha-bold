@@ -55,10 +55,13 @@ class DoorSensor:
         Calls on_change when the sensor changes, and returns how to stop.
         """
         seen_at: datetime | None = None
-        # What was stored for another sensor, before the link was changed,
-        # says nothing about this door.
-        if stored is not None and stored.get(ATTR_DOOR_SENSOR) == self._link_id:
+        if stored is not None:
+            # Kept when the link changes sensor: an opening can only show the
+            # lock unlocked, until it reports locked again.
             self.opened_at = _stored_time(stored.get(ATTR_DOOR_OPENED_AT))
+        # How another sensor's door was, before the link was changed, could
+        # hide this door opening.
+        if stored is not None and stored.get(ATTR_DOOR_SENSOR) == self._link_id:
             seen_at = _stored_time(stored.get(ATTR_DOOR_SEEN_AT))
             if isinstance(open_ := stored.get(ATTR_DOOR_OPEN), bool):
                 self._was_open = open_
