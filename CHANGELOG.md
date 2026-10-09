@@ -2,13 +2,33 @@
 
 ## Unreleased
 
-- A lock with locked status on can be linked to its door's contact sensor,
-  from the integration's page. It then shows as unlocked once the door has
-  opened since it last reported locked, catching unlocks the lock missed.
-- An activation's activity says whether the Bold app activated the lock
-  automatically, as a phone came near, in its `automatic` attribute.
-- An activation's or deactivation's activity names the app that sent it, such
-  as the Bold app or Home Assistant, in its `client` attribute.
+### Link a lock to its door sensor
+
+Bold locks occasionally miss being turned, and keep showing their last
+position, such as locked while the door is actually open. If the door has a
+contact sensor, you can now link the two: once the door has opened, the lock
+shows as unlocked until it next reports locked.
+
+- Choose **Link a door sensor** on the Bold integration's page. Any lock with
+  locked status turned on can be linked.
+- Links keep working when you rename the lock or sensor, or change the
+  sensor's entity ID, and their titles follow the new names.
+- A repair tells you if a link stops working: its sensor was deleted or
+  disabled, or the lock's locked status was turned off.
+
+See [Linking a lock to its door sensor](docs/door-sensors.md).
+
+### Activity
+
+- **`automatic`** says whether the Bold app activated the lock as a phone
+  came near.
+- **`client`** names the app behind an activation or deactivation, such as
+  the Bold app or Home Assistant.
+
+### Documentation
+
+- The README is shorter, with one-click install buttons. The details moved
+  to pages under [docs](docs/), with new automation examples.
 
 ## 1.1.0 (2026-10-07)
 
