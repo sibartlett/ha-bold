@@ -29,6 +29,7 @@ from custom_components.bold.const import (
     EVENT_SCAN_INTERVAL,
     SUBENTRY_DOOR_SENSOR,
 )
+from custom_components.bold.diagnostics import async_get_config_entry_diagnostics
 
 from .conftest import (
     GATEWAY,
@@ -417,6 +418,94 @@ async def test_lock_named_as_in_home_assistant(
     assert await hass.config_entries.async_unload(entry.entry_id)
     hass.states.async_remove(LOCK_ENTITY)
     assert await reconfigure() == "Back Door"
+
+
+async def test_sensor_entity_id_renamed(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test a link follows its door sensor when its entity ID is changed."""
+    # Registered this time, so it can be renamed.
+    hass.states.async_remove(DOOR)
+    sensor = entity_registry.async_get_or_create(
+        "binary_sensor", "test", "door", suggested_object_id="front_door_contact"
+    )
+    assert sensor.entity_id == DOOR
+    hass.states.async_set(DOOR, STATE_OFF)
+    other = entity_registry.async_get_or_create("binary_sensor", "test", "other")
+    entry = MockConfigEntry(
+        domain=mock_config_entry.domain,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
+    )
+    await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_DOOR_SENSOR), context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {CONF_LOCK: str(LOCK_ID), CONF_DOOR_SENSOR: DOOR}
+    )
+    await hass.async_block_till_done()
+    subentry = next(iter(entry.subentries.values()))
+    # Stored by its registry ID, which survives renaming it.
+    assert subentry.data[CONF_DOOR_SENSOR] == sensor.id
+
+    with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+        # Other changes, and other sensors, don't reload.
+        entity_registry.async_update_entity(DOOR, name="Front door")
+        entity_registry.async_update_entity(
+            other.entity_id, new_entity_id="binary_sensor.renamed_other"
+        )
+        await hass.async_block_till_done()
+    reload.assert_not_called()
+
+    renamed = "binary_sensor.front_door"
+    entity_registry.async_update_entity(DOOR, new_entity_id=renamed)
+    hass.states.async_set(renamed, STATE_OFF)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    hass.states.async_set(renamed, STATE_ON)
+    await hass.async_block_till_done()
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+    # Changing the link suggests the sensor by its current entity ID.
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_DOOR_SENSOR),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id},
+    )
+    (key,) = result["data_schema"].schema
+    assert key.description == {"suggested_value": renamed}
+    # Diagnostics show it by its entity ID.
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+    assert diagnostics["door_sensors"] == {LOCK_ID: renamed}
+
+
+async def test_sensor_deleted(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test a lock whose door sensor was deleted acts as if not linked."""
+    entry = MockConfigEntry(
+        domain=mock_config_entry.domain,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
+        subentries_data=[
+            ConfigSubentryData(
+                data={CONF_LOCK: LOCK_ID, CONF_DOOR_SENSOR: "0123456789abcdef"},
+                subentry_type=SUBENTRY_DOOR_SENSOR,
+                title="🔒 Front Door → 🚪 Front Door contact",
+                unique_id=str(LOCK_ID),
+            )
+        ],
+    )
+    await setup_integration(hass, entry, aioclient_mock, [UPGRADED_LOCK, GATEWAY])
+    await _door(hass, STATE_ON)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
 
 async def test_lock_without_locked_status_not_offered(

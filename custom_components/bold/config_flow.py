@@ -182,7 +182,7 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
                 title=self._title(locks[lock], user_input[CONF_DOOR_SENSOR]),
                 data={
                     CONF_LOCK: int(lock),
-                    CONF_DOOR_SENSOR: user_input[CONF_DOOR_SENSOR],
+                    CONF_DOOR_SENSOR: self._registry_id(user_input[CONF_DOOR_SENSOR]),
                 },
                 unique_id=lock,
             )
@@ -219,16 +219,31 @@ class DoorSensorSubentryFlow(ConfigSubentryFlow):
                 self._get_entry(),
                 subentry,
                 title=self._title(lock_name, user_input[CONF_DOOR_SENSOR]),
-                data_updates={CONF_DOOR_SENSOR: user_input[CONF_DOOR_SENSOR]},
+                data_updates={
+                    CONF_DOOR_SENSOR: self._registry_id(user_input[CONF_DOOR_SENSOR])
+                },
             )
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=self.add_suggested_values_to_schema(
                 vol.Schema({vol.Required(CONF_DOOR_SENSOR): DOOR_SENSOR_SELECTOR}),
-                {CONF_DOOR_SENSOR: subentry.data[CONF_DOOR_SENSOR]},
+                {
+                    CONF_DOOR_SENSOR: er.async_resolve_entity_id(
+                        er.async_get(self.hass), subentry.data[CONF_DOOR_SENSOR]
+                    )
+                },
             ),
             description_placeholders={"lock": lock_name},
         )
+
+    def _registry_id(self, entity_id: str) -> str:
+        """Return the ID to store for a door sensor, which survives renaming it.
+
+        A sensor without a unique ID isn't in the registry, nor can it be renamed.
+        """
+        if entry := er.async_get(self.hass).async_get(entity_id):
+            return entry.id
+        return entity_id
 
     def _lock_name(self, device_id: int, fallback: str) -> str:
         """Return the lock's name in Home Assistant, like its door sensor's."""

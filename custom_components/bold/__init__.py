@@ -4,9 +4,9 @@ from functools import partial
 from typing import Any
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.config_entry_oauth2_flow import (
     ImplementationUnavailableError,
@@ -81,6 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BoldConfigEntry) -> bool
     _async_setup_bluetooth(hass, entry)
     async_setup_push(hass, entry)
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
+    _async_follow_door_sensors(hass, entry)
     return True
 
 
@@ -91,6 +92,34 @@ async def _async_entry_updated(hass: HomeAssistant, entry: BoldConfigEntry) -> N
     """
     if door_sensors(entry) != entry.runtime_data.door_sensors:
         hass.config_entries.async_schedule_reload(entry.entry_id)
+
+
+@callback
+def _async_follow_door_sensors(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
+    """Reload when a linked door sensor's entity ID changes, to follow it."""
+    linked = set(entry.runtime_data.door_sensors.values())
+    if not linked:
+        return
+    registry = er.async_get(hass)
+
+    @callback
+    def renamed(data: er.EventEntityRegistryUpdatedData) -> bool:
+        return (
+            data["action"] == "update"
+            and "entity_id" in data["changes"]
+            and (registry_entry := registry.async_get(data["entity_id"])) is not None
+            and registry_entry.id in linked
+        )
+
+    @callback
+    def reload(_: Event[er.EventEntityRegistryUpdatedData]) -> None:
+        hass.config_entries.async_schedule_reload(entry.entry_id)
+
+    entry.async_on_unload(
+        hass.bus.async_listen(
+            er.EVENT_ENTITY_REGISTRY_UPDATED, reload, event_filter=renamed
+        )
+    )
 
 
 async def _async_create_client(

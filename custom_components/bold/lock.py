@@ -25,6 +25,7 @@ from typing import Any
 from homeassistant.components.lock import LockEntity
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.restore_state import (
@@ -102,11 +103,8 @@ class BoldLock(BoldEntity, LockEntity, RestoreEntity):
         # The bolt's position when the current activation started: the lock
         # will be turned the other way.
         self._activation_bolt: bool | None = None
-        self._door = (
-            DoorSensor(door_sensor)
-            if (door_sensor := data.door_sensors.get(device.id))
-            else None
-        )
+        self._door_sensor = data.door_sensors.get(device.id)
+        self._door: DoorSensor | None = None
         self._update_from_device()
 
     async def async_added_to_hass(self) -> None:
@@ -131,7 +129,14 @@ class BoldLock(BoldEntity, LockEntity, RestoreEntity):
         )
         self.async_on_remove(self._cancel_expiry)
         self._schedule_expiry()
-        if self._door is not None:
+        # Following the sensor's current entity ID: the integration reloads when
+        # it's renamed. A deleted sensor leaves the lock as if not linked.
+        if self._door_sensor is not None and (
+            door_sensor := er.async_resolve_entity_id(
+                er.async_get(self.hass), self._door_sensor
+            )
+        ):
+            self._door = DoorSensor(door_sensor)
             stored = await self.async_get_last_extra_data()
             self.async_on_remove(
                 self._door.async_start(
