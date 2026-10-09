@@ -114,10 +114,6 @@ def _flag(value: bool | None) -> bool:
     return value is True
 
 
-def _bool(value: bool | None) -> bool | None:
-    return value if isinstance(value, bool) else None
-
-
 def _lower(value: str | None) -> str | None:
     return value.lower() if isinstance(value, str) else None
 
@@ -296,9 +292,9 @@ class BoldEvent:
     method: str | None
     user_name: str | None
     remote_activation: bool
-    # Whether the Bold app activated it as a phone came near; None when Bold
-    # doesn't say.
-    auto_activation: bool | None
+    # Whether the Bold app activated it as a phone came near. Bold leaves this
+    # out for activations that can't be, such as by the button.
+    auto_activation: bool
     activation_time: timedelta | None
     keep_active_until: datetime | None
     bolt_locked: bool | None
@@ -340,7 +336,7 @@ class BoldEvent:
             # Remote activations name the Bold Connect they went through;
             # "remoteActivation" is documented but not always sent.
             remote_activation=_flag(data.get("remoteActivation")) or bool(connect),
-            auto_activation=_bool(data.get("autoActivation")),
+            auto_activation=_flag(data.get("autoActivation")),
             activation_time=parse_duration(data.get("activationTime")),
             keep_active_until=parse_datetime(data.get("keepActiveUntil")),
             bolt_locked=(

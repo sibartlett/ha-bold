@@ -71,8 +71,8 @@ async def test_activation_event(
     assert state.attributes["method"] == "Pin"
     assert state.attributes["result"] == "Success"
     assert state.attributes["remote"] is False
-    # Bold doesn't say whether this one was automatic.
-    assert state.attributes["automatic"] is None
+    # Bold only says whether an activation was automatic when it could be.
+    assert state.attributes["automatic"] is False
     assert state.attributes["time"] == "2026-09-24T12:00:10+00:00"
     # Pushed events have no ID, so none is exposed.
     assert "bold_event_id" not in state.attributes

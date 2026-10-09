@@ -187,9 +187,8 @@ happened (`time`, by the device's clock, but never later than it reached Home
 Assistant) and who did it (`user`, when Bold knows); activations and
 deactivations add the `method` (e.g. `Pin`, `Button`, `Ble`) and whether it
 was `remote`, activations their `result` and `automatic` (whether the Bold
-app activated the lock as a phone came near; unknown when Bold doesn't say),
-and tamper alerts the `tamper_type` (`vibration`, `rotations` or
-`faulty_pin`).
+app activated the lock as a phone came near), and tamper alerts the
+`tamper_type` (`vibration`, `rotations` or `faulty_pin`).
 
 ## How data is updated
 
