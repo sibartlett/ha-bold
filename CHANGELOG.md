@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-10-09)
 
 ### Link a lock to its door sensor
 
