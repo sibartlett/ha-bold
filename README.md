@@ -1,5 +1,9 @@
 # Bold Smart Lock for Home Assistant
 
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
+[![Release](https://img.shields.io/github/v/release/sibartlett/ha-bold)](https://github.com/sibartlett/ha-bold/releases)
+[![Tests](https://github.com/sibartlett/ha-bold/actions/workflows/tests.yml/badge.svg)](https://github.com/sibartlett/ha-bold/actions/workflows/tests.yml)
+
 Bring your [Bold Smart Locks](https://boldsmartlock.com) into Home Assistant.
 Unlock your doors from a dashboard, an automation or your voice assistant, see
 who came and went, and get a heads-up before a battery runs out.
@@ -31,11 +35,19 @@ who came and went, and get a heads-up before a battery runs out.
 
 You'll need Home Assistant 2026.8 or later.
 
-1. In HACS, add `https://github.com/sibartlett/ha-bold` as a custom repository
-   (type: Integration), then download **Bold Smart Lock**.
+1. Open the repository in HACS, and download **Bold Smart Lock**:
+
+   [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=sibartlett&repository=ha-bold&category=integration)
+
+   Or, in HACS, add `https://github.com/sibartlett/ha-bold` as a custom
+   repository (type: Integration).
 2. Restart Home Assistant.
-3. Go to **Settings → Devices & services → Add integration**, choose
-   **Bold Smart Lock**, and sign in with your Bold account.
+3. Add the integration, and sign in with your Bold account:
+
+   [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=bold)
+
+   Or go to **Settings → Devices & services → Add integration**, and choose
+   **Bold Smart Lock**.
 
 To sign in, you'll use either:
 
