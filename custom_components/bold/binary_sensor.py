@@ -1,6 +1,7 @@
 """Binary sensor platform for the Bold integration."""
 
-from homeassistant.components.binary_sensor import (
+# Home Assistant 2026.10 moved it to binary_sensor.const, which 2026.8 lacks.
+from homeassistant.components.binary_sensor import (  # type: ignore[attr-defined]
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )

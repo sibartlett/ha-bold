@@ -4,7 +4,8 @@ from collections.abc import Mapping
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+# Home Assistant 2026.10 moved it to binary_sensor.const, which 2026.8 lacks.
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass  # type: ignore[attr-defined]
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     ConfigEntry,
@@ -23,7 +24,13 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
 )
-import voluptuous as vol
+
+# Home Assistant's flows are typed for probatio since 2026.10, and still take
+# voluptuous, its API-compatible predecessor, which 2026.8 needs.
+if TYPE_CHECKING:
+    import probatio as vol
+else:
+    import voluptuous as vol
 
 from .boldsmartlock import BoldClient, BoldError
 from .const import CONF_DOOR_SENSOR, CONF_LOCK, DOMAIN, SUBENTRY_DOOR_SENSOR
