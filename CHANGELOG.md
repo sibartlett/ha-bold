@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Battery levels match what Bold sends
+
+The battery level now shows Excellent, Good, Low or Critical. Any other level
+Bold sends is shown as it is, rather than as unknown.
+
 ## 1.2.1 (2026-10-15)
 
 ### The lock action activates an unlocked lock
