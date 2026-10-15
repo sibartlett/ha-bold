@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changes
+
+- **Lock readies an unlocked door to be locked.** With locked status on,
+  **Lock** on a lock that shows as unlocked now activates it, so someone
+  outside can turn it to lock, rather than failing. During an activation, it
+  leaves the lock activated, rather than ending it before it's locked.
+
 ## 1.2.0 (2026-10-09)
 
 ### Link a lock to its door sensor

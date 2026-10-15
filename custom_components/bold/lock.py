@@ -24,7 +24,7 @@ from typing import Any
 
 from homeassistant.components.lock import LockEntity
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_point_in_utc_time
@@ -267,14 +267,17 @@ class BoldLock(BoldEntity, LockEntity, RestoreEntity):
         self.async_write_ha_state()
 
     async def async_lock(self, **kwargs: Any) -> None:
-        """End an activation early. Bold locks can't throw the bolt themselves."""
+        """End an activation early, or ready an unlocked bolt to be locked.
+
+        Bold locks can't throw the bolt themselves, and from outside can only be
+        turned while activated: an unlocked bolt is activated, or left activated,
+        so someone can turn it to lock.
+        """
+        if self._reports_bolt and self._bolt is False:
+            if not self._is_active:
+                await self.async_unlock()
+            return
         if not self._is_active:
-            if self._reports_bolt and not self._bolt:
-                raise ServiceValidationError(
-                    translation_domain=DOMAIN,
-                    translation_key="bolt_open",
-                    translation_placeholders={"name": self.device.name},
-                )
             return
         await self._async_send_showing_progress(COMMAND_DEACTIVATE)
         self._set_inactive(dt_util.utcnow())

@@ -59,8 +59,9 @@ problem returns after being fixed.
 ## Known limitations
 
 - **Bold locks aren't motorised.** Unlocking lets someone turn the lock by
-  hand for a few seconds, and **Lock** just ends that early. Nothing can turn
-  the bolt for you.
+  hand for a few seconds. **Lock** ends that early, or, if the lock shows as
+  unlocked, activates it so someone can turn it to lock. Nothing can turn the
+  bolt for you.
 - **Whether a door is locked** needs a Bold Elite or an upgraded Bold
   Classic, with locked status turned on in the Bold app. Other locks show as
   unlocked only while they're activated.
