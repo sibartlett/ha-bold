@@ -7,7 +7,6 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.lock import SERVICE_LOCK, SERVICE_UNLOCK, LockState
 from homeassistant.const import ATTR_ASSUMED_STATE
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -328,17 +327,40 @@ async def test_unlock_not_turned(
     assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
 
 
-async def test_lock_open_bolt(
+async def test_lock_open_bolt_activates(
     hass: HomeAssistant,
     upgraded: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
     frozen_time: FrozenDateTimeFactory,
 ) -> None:
-    """Test locking an open bolt explains it has to be turned by hand."""
+    """Test locking an open bolt activates it, so it can be turned from outside."""
     set_events(aioclient_mock, [_bolt_event(10, "2026-09-24T12:00:20Z", "Unlocked")])
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
-    with pytest.raises(ServiceValidationError, match="turn the knob"):
-        await call_lock(hass, SERVICE_LOCK)
+    await call_lock(hass, SERVICE_LOCK)
+    assert any(
+        "remote-activation" in str(call[1]) for call in aioclient_mock.mock_calls
+    )
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKING
+
+    # Not turned: back to unlocked when the activation ends.
+    await advance(hass, frozen_time, timedelta(seconds=15))
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+async def test_lock_open_bolt_stays_activated(
+    hass: HomeAssistant,
+    upgraded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test locking an activated, open bolt leaves it activated to be turned."""
+    set_events(aioclient_mock, [_bolt_event(10, "2026-09-24T12:00:20Z", "Unlocked")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    await call_lock(hass, SERVICE_UNLOCK)
+    activations = len(aioclient_mock.mock_calls)
+    await call_lock(hass, SERVICE_LOCK)
+    assert len(aioclient_mock.mock_calls) == activations
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKING
 
 
 async def test_lock_ends_activation(
