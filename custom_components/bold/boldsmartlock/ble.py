@@ -244,10 +244,7 @@ async def async_send_command(
     """
     # Only available when Home Assistant's Bluetooth integration is set up.
     from bleak.exc import BleakError  # noqa: PLC0415
-    from bleak_retry_connector import (  # noqa: PLC0415
-        BleakClientWithServiceCache,
-        establish_connection,
-    )
+    from bleak_retry_connector import BleakClientWithServiceCache, establish_connection  # noqa: PLC0415
 
     try:
         async with asyncio.timeout(timeout):
