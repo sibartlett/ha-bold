@@ -2,18 +2,10 @@
 
 ## Unreleased
 
-### Lock gets a door ready to lock
+### Lock now gets a door ready to lock
 
-Bold locks can't throw the bolt themselves: someone has to turn them, and
-from outside, only while they're activated. So when a lock with locked
-status on shows as unlocked, **Lock** now activates it, giving whoever's at
-the door a few seconds to turn it. Before, it just told you the lock couldn't
-lock itself.
-
-- Pressing **Lock** again while the lock is activated keeps it activated,
-  rather than cutting it short before anyone's turned it.
-- When the lock shows as locked, nothing changes: **Lock** ends an
-  activation early.
+When a lock shows as unlocked, **Lock** now activates it, so you can turn it
+to lock. Before, it showed an error.
 
 ## 1.2.0 (2026-10-09)
 
