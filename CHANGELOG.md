@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### Lock now gets a door ready to lock
+### Lock activates an unlocked lock
 
 When a lock shows as unlocked, **Lock** now activates it, so you can turn it
 to lock. Before, it showed an error.
