@@ -2,12 +2,10 @@
 
 ## Unreleased
 
-### Changes
+### The lock action activates an unlocked lock
 
-- **Lock readies an unlocked door to be locked.** With locked status on,
-  **Lock** on a lock that shows as unlocked now activates it, so someone
-  outside can turn it to lock, rather than failing. During an activation, it
-  leaves the lock activated, rather than ending it before it's locked.
+When a lock shows as unlocked, the **Lock** action now activates it, so you can
+turn it to lock. Before, it showed an error.
 
 ## 1.2.0 (2026-10-09)
 
