@@ -7,7 +7,7 @@ it by hand for a few seconds (the activation time you set in the Bold app).
 
 | Entity | What it does |
 |---|---|
-| `lock.<lock>` | **Unlock** activates the lock, and **Lock** ends an activation early. With locked status on, it shows whether the bolt is locked or unlocked, and, while activated and waiting to be turned, unlocking or locking. Otherwise it shows unlocked while activated and locked the rest of the time, as an assumed state. `changed_by` shows who last activated or deactivated it. |
+| `lock.<lock>` | **Unlock** activates the lock, and **Lock** ends an activation early. With locked status on, **Lock** on an unlocked lock activates it instead, or leaves it activated, so someone outside can turn it to lock. It goes by the status shown, so if a turn was missed, it can activate a lock that's actually locked. With locked status on, it shows whether the bolt is locked or unlocked, and, while activated and waiting to be turned, unlocking or locking. Otherwise it shows unlocked while activated and locked the rest of the time, as an assumed state. `changed_by` shows who last activated or deactivated it. |
 | `event.<lock>_activity` | Fires for activations, failed activations (such as a wrong PIN), deactivations, tamper alerts, and, with locked status on, the bolt being locked or unlocked. See [Activity](#activity) for what it tells you. |
 | `sensor.<lock>_battery_level` | Bold's battery level: Excellent, High, Medium, Low or Critical. |
 | `binary_sensor.<lock>_battery` | On when the battery is Low or Critical. |
