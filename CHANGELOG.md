@@ -2,12 +2,18 @@
 
 ## Unreleased
 
-### Changes
+### Lock gets a door ready to lock
 
-- **Lock readies an unlocked door to be locked.** With locked status on,
-  **Lock** on a lock that shows as unlocked now activates it, so someone
-  outside can turn it to lock, rather than failing. During an activation, it
-  leaves the lock activated, rather than ending it before it's locked.
+Bold locks can't throw the bolt themselves: someone has to turn them, and
+from outside, only while they're activated. So when a lock with locked
+status on shows as unlocked, **Lock** now activates it, giving whoever's at
+the door a few seconds to turn it. Before, it just told you the lock couldn't
+lock itself.
+
+- Pressing **Lock** again while the lock is activated keeps it activated,
+  rather than cutting it short before anyone's turned it.
+- When the lock shows as locked, nothing changes: **Lock** ends an
+  activation early.
 
 ## 1.2.0 (2026-10-09)
 
