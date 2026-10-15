@@ -2,10 +2,10 @@
 
 ## Unreleased
 
-### Lock activates an unlocked lock
+### The lock action activates an unlocked lock
 
-When a lock shows as unlocked, **Lock** now activates it, so you can turn it
-to lock. Before, it showed an error.
+When a lock shows as unlocked, the **Lock** action now activates it, so you can
+turn it to lock. Before, it showed an error.
 
 ## 1.2.0 (2026-10-09)
 
