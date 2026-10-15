@@ -11,13 +11,11 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .boldsmartlock import BoldDevice
-from .const import CONNECT_OFFLINE_AFTER
+from .const import BATTERY_LEVELS, CONNECT_OFFLINE_AFTER, LOW_BATTERY_LEVELS
 from .coordinator import BoldConfigEntry
 from .entity import BoldEntity, async_add_device_entities
 
 PARALLEL_UPDATES = 0
-
-LOW_BATTERY_LEVELS = {"low", "critical"}
 
 
 async def async_setup_entry(
@@ -46,8 +44,8 @@ class BoldBatteryLowSensor(BoldEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return whether the battery is low."""
-        if (level := self.device.battery_level) is None:
+        """Return whether the battery is low, unless it's a level we don't know."""
+        if (level := self.device.battery_level) not in BATTERY_LEVELS:
             return None
         return level in LOW_BATTERY_LEVELS
 

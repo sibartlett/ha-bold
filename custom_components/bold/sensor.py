@@ -1,5 +1,6 @@
 """Sensor platform for the Bold integration."""
 
+from abc import abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -21,6 +22,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .boldsmartlock import BoldDevice, BoldEvent
+from .const import BATTERY_LEVELS, SIGNAL_LEVELS
 from .coordinator import BoldConfigEntry, BoldRuntimeData
 from .entity import BoldEntity, BoldEventEntity, async_add_device_entities
 
@@ -34,9 +36,6 @@ SCAN_INTERVAL = timedelta(seconds=30)
 
 # Status reports this many seconds after a lock started are from its boot.
 BOOT_STATUS_UPTIME = 60
-
-# Bold reports battery and signal levels as words, on the same scale.
-LEVELS = ["excellent", "high", "medium", "low", "critical"]
 
 
 async def async_setup_entry(
@@ -77,40 +76,56 @@ async def async_setup_entry(
     async_add_device_entities(entry, async_add_entities, create_entities)
 
 
-def _level(level: str | None, what: str, device_name: str) -> str | None:
-    """Return a level if it is one we know."""
-    if level is not None and level not in LEVELS:
-        _LOGGER.debug("Unknown %s %r for %s", what, level, device_name)
-        return None
-    return level
+class BoldLevelSensor(BoldEntity, SensorEntity):
+    """A level Bold reports as a word.
+
+    A word it isn't known to send is shown as Bold sent it, rather than as
+    unknown, and added to the options so the sensor can show it.
+    """
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _levels: list[str]
+
+    @property
+    @abstractmethod
+    def _level(self) -> str | None:
+        """Return the level as Bold reported it."""
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the level."""
+        return self._level
+
+    @property
+    def options(self) -> list[str]:
+        """Return the known levels, and the current one if it isn't."""
+        if (level := self._level) is None or level in self._levels:
+            return self._levels
+        _LOGGER.debug("Unknown level %r for %s", level, self.entity_id)
+        return [*self._levels, level]
 
 
-class BoldBatteryLevelSensor(BoldEntity, SensorEntity):
+class BoldBatteryLevelSensor(BoldLevelSensor):
     """Battery level of a Bold lock."""
 
-    _attr_device_class = SensorDeviceClass.ENUM
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_options = LEVELS
     _attr_translation_key = "battery_level"
+    _levels = BATTERY_LEVELS
 
     @property
-    def native_value(self) -> str | None:
-        """Return the battery level."""
-        return _level(self.device.battery_level, "battery level", self.device.name)
+    def _level(self) -> str | None:
+        return self.device.battery_level
 
 
-class BoldConnectSignalSensor(BoldEntity, SensorEntity):
+class BoldConnectSignalSensor(BoldLevelSensor):
     """How well a Bold lock reaches its Bold Connect."""
 
-    _attr_device_class = SensorDeviceClass.ENUM
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_options = LEVELS
     _attr_translation_key = "connect_signal"
+    _levels = SIGNAL_LEVELS
 
     @property
-    def native_value(self) -> str | None:
-        """Return the signal level."""
-        return _level(self.device.gateway_rssi_level, "signal level", self.device.name)
+    def _level(self) -> str | None:
+        return self.device.gateway_rssi_level
 
 
 class BoldConnectSignalStrengthSensor(BoldEntity, SensorEntity):

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Battery levels match what Bold sends
+
+The battery level now shows Excellent, Good, Low or Critical. Any other level
+Bold sends is shown as it is, rather than as unknown.
+
 ### Diagnostics leave out account IDs
 
 Diagnostics no longer include the IDs of your Bold account, its users or your

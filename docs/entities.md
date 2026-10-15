@@ -9,11 +9,11 @@ it by hand for a few seconds (the activation time you set in the Bold app).
 |---|---|
 | `lock.<lock>` | **Unlock** activates the lock, and **Lock** ends an activation early. With locked status on, **Lock** on an unlocked lock activates it instead, or leaves it activated, so someone outside can turn it to lock. It goes by the status shown, so if a turn was missed, it can activate a lock that's actually locked. With locked status on, it shows whether the bolt is locked or unlocked, and, while activated and waiting to be turned, unlocking or locking. Otherwise it shows unlocked while activated and locked the rest of the time, as an assumed state. `changed_by` shows who last activated or deactivated it. |
 | `event.<lock>_activity` | Fires for activations, failed activations (such as a wrong PIN), deactivations, tamper alerts, and, with locked status on, the bolt being locked or unlocked. See [Activity](#activity) for what it tells you. |
-| `sensor.<lock>_battery_level` | Bold's battery level: Excellent, High, Medium, Low or Critical. |
-| `binary_sensor.<lock>_battery` | On when the battery is Low or Critical. |
+| `sensor.<lock>_battery_level` | Bold's battery level: Excellent, Good, Low or Critical. Any other level Bold sends is shown as it is. |
+| `binary_sensor.<lock>_battery` | On when the battery is Low or Critical, and unknown for a level it doesn't recognise. |
 | `sensor.<lock>_battery_voltage` | Battery voltage at rest, from the lock's daily status report and occasional extra readings. |
 | `sensor.<lock>_battery_voltage_under_load` | Battery voltage under load, from the daily status report. Weak batteries sag under load before they drop at rest, so this warns you earlier. Unknown on days the lock doesn't measure it, such as when its motor didn't run. |
-| `sensor.<lock>_bold_connect_signal` | How well the lock reaches its Bold Connect: Excellent, High, Medium, Low or Critical. |
+| `sensor.<lock>_bold_connect_signal` | How well the lock reaches its Bold Connect: Excellent, High, Medium, Low or Critical. Any other level Bold sends is shown as it is. |
 | `sensor.<lock>_bold_connect_signal_strength` | The same signal, in dBm. Disabled by default. |
 | `sensor.<lock>_bluetooth_signal` | How well Home Assistant hears the lock over Bluetooth, in dBm, or unavailable when it can't. Handy for placing an ESPHome Bluetooth proxy. Only when Home Assistant has Bluetooth. |
 | `update.<lock>_firmware` | Whether the lock is on the firmware version Bold requires. |
