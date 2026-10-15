@@ -108,8 +108,7 @@
         "name": "Battery level",
         "state": {
           "excellent": "Excellent",
-          "high": "High",
-          "medium": "Medium",
+          "good": "Good",
           "low": "Low",
           "critical": "Critical"
         }

@@ -404,8 +404,7 @@
     'capabilities': dict({
       <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
         'excellent',
-        'high',
-        'medium',
+        'good',
         'low',
         'critical',
       ]),
@@ -447,8 +446,7 @@
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Front Door Battery level',
       <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
         'excellent',
-        'high',
-        'medium',
+        'good',
         'low',
         'critical',
       ]),

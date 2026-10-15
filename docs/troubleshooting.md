@@ -75,8 +75,9 @@ problem returns after being fixed.
   Connect going offline is noticed after 30–40 minutes.
 - **Locks without a Bold Connect** only report activity when a phone with the
   Bold app passes by.
-- **Battery levels** are Bold's five levels, from Excellent to Critical, not
-  percentages.
+- **Battery levels** are Bold's words, from Excellent to Critical, not
+  percentages. Bold doesn't document them, so a level it sends that we don't
+  recognise is shown as it is.
 
 ## Reporting a problem
 

@@ -26,13 +26,7 @@ async def test_battery(
     """Test the battery level and low battery sensors."""
     state = hass.states.get("sensor.front_door_battery_level")
     assert state.state == "excellent"
-    assert state.attributes["options"] == [
-        "excellent",
-        "high",
-        "medium",
-        "low",
-        "critical",
-    ]
+    assert state.attributes["options"] == ["excellent", "good", "low", "critical"]
     entry = entity_registry.async_get("sensor.front_door_battery_level")
     assert entry.unique_id == "1_battery_level"
 
@@ -48,10 +42,12 @@ async def test_battery(
 @pytest.mark.parametrize(
     ("battery_level", "level_state", "low_state"),
     [
+        ("Good", "good", STATE_OFF),
         ("Low", "low", STATE_ON),
         ("Critical", "critical", STATE_ON),
-        ("Medium", "medium", STATE_OFF),
-        ("Something new", STATE_UNKNOWN, STATE_OFF),
+        # Shown as Bold sent it, but not known to be low or not.
+        ("Medium", "medium", STATE_UNKNOWN),
+        ("Something new", "something new", STATE_UNKNOWN),
         (None, STATE_UNKNOWN, STATE_UNKNOWN),
     ],
 )
@@ -74,5 +70,41 @@ async def test_battery_levels(
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert hass.states.get("sensor.front_door_battery_level").state == level_state
+    state = hass.states.get("sensor.front_door_battery_level")
+    assert state.state == level_state
+    # A level we don't know is added to the options, so it can be shown.
+    known = ["excellent", "good", "low", "critical"]
+    assert state.attributes["options"] == (
+        known
+        if battery_level is None or level_state in known
+        else [*known, level_state]
+    )
     assert hass.states.get("binary_sensor.front_door_battery").state == low_state
+
+
+async def test_unknown_signal_level(
+    hass: HomeAssistant,
+    setup_credentials: None,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test a signal level Bold isn't known to send is shown as it sent it."""
+    aioclient_mock.get(
+        f"{API_URL}/v2/devices",
+        json=[{**LOCK, "gateway": {**LOCK["gateway"], "rssiLevel": "Good"}}, GATEWAY],
+    )
+    aioclient_mock.get(f"{API_URL}/v2/events", json=[])
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.front_door_bold_connect_signal")
+    assert state.state == "good"
+    assert state.attributes["options"] == [
+        "excellent",
+        "high",
+        "medium",
+        "low",
+        "critical",
+        "good",
+    ]
