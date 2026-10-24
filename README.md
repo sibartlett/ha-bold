@@ -16,7 +16,8 @@ when and how they're unlocked, and get a heads-up before a battery runs out.
   near the door. Bluetooth is faster, and keeps working if the internet goes
   down while Home Assistant is running.
 - **See when your doors are unlocked, and how**: from the app, a PIN or the
-  button, usually within seconds, and by whom when it's the app.
+  button, usually within seconds, and by whom when it's the Bold app or Home
+  Assistant.
 - **Know whether a door is locked**, with a Bold Elite or an upgraded Bold
   Classic.
 - **Get alerts** for wrong PINs, tamper warnings, low batteries, or a Bold
