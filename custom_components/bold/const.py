@@ -43,6 +43,13 @@ PUSHED_EVENT_TYPES: Final[list[str]] = [
 # ago. It checks in every few minutes, and devices are polled every 10.
 CONNECT_OFFLINE_AFTER: Final = timedelta(minutes=30)
 
+# Bold's battery levels, best first: Excellent and Critical as Bold reports
+# them, Good as a user saw it, and Low from Bold's help pages. It may send others.
+BATTERY_LEVELS: Final[list[str]] = ["excellent", "good", "low", "critical"]
+LOW_BATTERY_LEVELS: Final = {"low", "critical"}
+# Bold's signal levels, best first, as its API documents them.
+SIGNAL_LEVELS: Final[list[str]] = ["excellent", "high", "medium", "low", "critical"]
+
 # Locks only report their battery voltage when they're turned, so at startup
 # the latest reading from this far back is used.
 BATTERY_VOLTAGE_HISTORY: Final = timedelta(days=7)
