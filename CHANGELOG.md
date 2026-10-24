@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.2 (2026-10-24)
 
 ### Battery levels match what Bold sends
 
