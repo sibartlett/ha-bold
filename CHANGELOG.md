@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Diagnostics leave out account IDs
+
+Diagnostics no longer include the IDs of your Bold account, its users or your
+organization, so they're safer to share in a public issue.
+
 ## 1.2.1 (2026-10-15)
 
 ### The lock action activates an unlocked lock

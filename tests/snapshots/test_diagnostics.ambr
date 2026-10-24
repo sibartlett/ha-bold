@@ -49,11 +49,11 @@
         }),
         'name': 'Front Door',
         'owner': dict({
-          'accountId': 42,
+          'accountId': '**REDACTED**',
           'firstName': '**REDACTED**',
           'lastName': '**REDACTED**',
           'name': '**REDACTED**',
-          'organizationId': 7,
+          'organizationId': '**REDACTED**',
         }),
         'reachableDevices': list([
         ]),
@@ -92,7 +92,7 @@
         }),
         'name': 'Bold Connect',
         'owner': dict({
-          'organizationId': 7,
+          'organizationId': '**REDACTED**',
         }),
         'settings': dict({
         }),
@@ -118,26 +118,28 @@
     'recent_events': list([
       dict({
         'category': 'AccessEvent',
+        'clientId': 'bold-app',
+        'clientInstanceId': '**REDACTED**',
         'device': dict({
           'id': 1,
           'name': 'Front Door',
         }),
         'id': 10,
         'organization': dict({
-          'id': 7,
+          'id': '**REDACTED**',
           'name': '**REDACTED**',
         }),
         'result': 'Success',
         'time': '2026-09-24T12:00:10Z',
         'triggeredBy': dict({
-          'accountId': 42,
-          'userId': 3,
+          'accountId': '**REDACTED**',
+          'userId': '**REDACTED**',
         }),
         'type': 'DeviceActivation',
         'user': dict({
           'emailAddress': '**REDACTED**',
           'firstName': '**REDACTED**',
-          'id': 3,
+          'id': '**REDACTED**',
           'lastName': '**REDACTED**',
         }),
       }),

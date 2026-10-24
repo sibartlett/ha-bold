@@ -58,6 +58,8 @@ async def test_diagnostics(
                     "emailAddress": "ada@example.com",
                 },
                 organization={"id": 7, "name": "The Lovelaces"},
+                clientId="bold-app",
+                clientInstanceId="ada-phone",
             )
         ],
     )
@@ -67,8 +69,21 @@ async def test_diagnostics(
     assert diagnostics == snapshot
     # Nobody's name or email address is included, in devices or events.
     output = json.dumps(diagnostics)
-    for personal in ("Ada", "Lovelace", "ada@example.com"):
+    for personal in ("Ada", "Lovelace", "ada@example.com", "ada-phone"):
         assert personal not in output
+    # Nor the IDs of anyone's Bold account, user or organization: the account
+    # ID is also the entry's unique ID. Devices and events keep theirs.
+    (lock, gateway) = diagnostics["devices"]
+    assert lock["owner"]["accountId"] == REDACTED
+    assert lock["owner"]["organizationId"] == REDACTED
+    assert gateway["owner"]["organizationId"] == REDACTED
+    (event,) = diagnostics["recent_events"]
+    assert event["triggeredBy"] == {"accountId": REDACTED, "userId": REDACTED}
+    assert event["user"]["id"] == REDACTED
+    assert event["organization"]["id"] == REDACTED
+    assert (lock["id"], event["id"], event["device"]["id"]) == (LOCK_ID, 10, LOCK_ID)
+    # The app behind an activation is kept: it names an app, not a person.
+    assert event["clientId"] == "bold-app"
     # The token, and the webhook's ID and secret, which let anyone push
     # events, are never included.
     assert diagnostics["entry"]["token"] == REDACTED
