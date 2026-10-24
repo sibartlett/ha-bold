@@ -31,10 +31,11 @@ Unlocking from Home Assistant updates the lock straight away.
 ## Bluetooth
 
 To unlock over Bluetooth, Bold's cloud issues each lock a handshake, valid for
-about a week, and signed commands. The integration fetches them every 12
-hours and stores them, so locks in range can be unlocked for several days
-without internet. Home Assistant keeps track of which locks it can hear as
-they advertise.
+about a week, and signed commands. The integration fetches them every 12 hours
+and stores them, so locks in range can be unlocked for several days without
+internet, as long as Home Assistant keeps running: it needs Bold's cloud to
+set the integration up after a restart. Home Assistant keeps track of which
+locks it can hear as they advertise.
 
 ## Where the keys are kept
 
