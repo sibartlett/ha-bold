@@ -32,8 +32,9 @@ problem returns after being fixed.
 - **Unlocking fails with "Too many requests".** Bold limits how often locks can
   be activated. Wait a moment and try again.
 - **A lock has no activity entity.** The lock doesn't support Bold's event log.
-  If the log says the account "is not allowed to read the event log", your Bold
-  account doesn't have access to it.
+- **A lock's activity never changes.** If the log says the account "is not
+  allowed to read the event log", your Bold account doesn't have access to it,
+  so activity isn't tracked.
 - **Activity takes up to 30 seconds to appear.** Bold isn't pushing it: Home
   Assistant needs an external URL Bold can reach, or Home Assistant Cloud. The
   integration's diagnostics show whether pushes are working and when the last
