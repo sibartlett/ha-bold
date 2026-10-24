@@ -7,8 +7,8 @@
 - Get notified about failed PIN attempts or tamper alerts.
 - Know when someone activates the lock, and whether they used the app, a PIN
   or the button.
-- Get warned when a lock's batteries run low or the Bold Connect goes offline,
-  before remote unlocking stops working.
+- Get warned when a lock's batteries run low, before they run out, or when the
+  Bold Connect goes offline, and remote unlocking has stopped working.
 
 ## Examples
 
