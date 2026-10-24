@@ -75,7 +75,7 @@ problem returns after being fixed.
   Connect going offline is noticed after 30–40 minutes.
 - **Bluetooth unlocking without internet** only works while Home Assistant
   keeps running. After a restart, the integration waits for Bold's cloud
-  before it sets up, and no lock can be unlocked until then.
+  before it sets up, and Home Assistant can't unlock any lock until then.
 - **Locks without a Bold Connect** only report activity when a phone with the
   Bold app passes by.
 - **Battery levels** are Bold's words, from Excellent to Critical, not

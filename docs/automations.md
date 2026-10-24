@@ -37,10 +37,10 @@ actions:
         ({{ trigger.to_state.attributes.method or trigger.to_state.attributes.tamper_type }})
 ```
 
-Log who unlocked the door, and how:
+Log who activated the lock, and how:
 
 ```yaml
-alias: Front door unlocked
+alias: Front door activated
 triggers:
   - trigger: state
     entity_id: event.front_door_activity
@@ -55,7 +55,7 @@ actions:
     data:
       name: Front door
       message: >
-        unlocked by {{ trigger.to_state.attributes.user or "someone" }}
+        activated by {{ trigger.to_state.attributes.user or "someone" }}
         using {{ trigger.to_state.attributes.method }}
 ```
 
