@@ -23,26 +23,41 @@ TO_REDACT = {
     "externalId",
     "userExternalId",
     "webKey",
+    "accountId",
+    "userId",
+    "organizationId",
+    "deviceOrganizationId",
+    "clientInstanceId",
+    "customerId",
+    "subscriptionId",
+    "subscriptionAccountId",
 }
-# Objects naming a person or organization, e.g. a device's owner. Their
-# "name" is redacted; other names, such as a device's, are kept.
-NAMED_PARTIES = {"owner", "user", "account", "triggeredBy", "organization"}
+# Objects describing a person or organization, e.g. a device's owner. Their
+# "name" and "id" are redacted; other names and IDs, such as a device's, are
+# kept.
+PARTIES = {"owner", "user", "account", "triggeredBy", "organization"}
+PARTY_REDACT = ("name", "id")
 
 
 def _redact(data: Any) -> Any:
     """Redact secrets and personal details from Bold's API data."""
-    return _redact_party_names(async_redact_data(data, TO_REDACT))
+    return _redact_parties(async_redact_data(data, TO_REDACT))
 
 
-def _redact_party_names(data: Any) -> Any:
+def _redact_parties(data: Any) -> Any:
     if isinstance(data, list):
-        return [_redact_party_names(item) for item in data]
+        return [_redact_parties(item) for item in data]
     if not isinstance(data, dict):
         return data
-    redacted = {key: _redact_party_names(value) for key, value in data.items()}
-    for key in NAMED_PARTIES & redacted.keys():
-        if isinstance(party := redacted[key], dict) and party.get("name"):
-            redacted[key] = {**party, "name": REDACTED}
+    redacted = {key: _redact_parties(value) for key, value in data.items()}
+    for key in PARTIES & redacted.keys():
+        if isinstance(party := redacted[key], dict):
+            redacted[key] = {
+                field: REDACTED
+                if field in PARTY_REDACT and value is not None
+                else value
+                for field, value in party.items()
+            }
     return redacted
 
 
