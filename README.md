@@ -6,7 +6,7 @@
 
 Bring your [Bold Smart Locks](https://boldsmartlock.com) into Home Assistant.
 Unlock your doors from a dashboard, an automation or your voice assistant, see
-when and how they're unlocked, and get a heads-up before a battery runs out.
+when and how they're used, and get a heads-up before a battery runs out.
 
 ## What you can do
 
@@ -15,9 +15,8 @@ when and how they're unlocked, and get a heads-up before a battery runs out.
   [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html)
   near the door. Bluetooth is faster, and keeps working if the internet goes
   down while Home Assistant is running.
-- **See when your doors are unlocked, and how**: from the app, a PIN or the
-  button, usually within seconds, and by whom when it's the Bold app or Home
-  Assistant.
+- **See when your locks are activated, and how**: from the app, a PIN or the
+  button, usually within seconds, and by whom when it's the Bold app.
 - **Know whether a door is locked**, with a Bold Elite or an upgraded Bold
   Classic.
 - **Get alerts** for wrong PINs, tamper warnings, low batteries, or a Bold
@@ -80,7 +79,7 @@ dashboards afterwards.
 ## What you get
 
 Each lock gets a **lock** to unlock it, an **activity** event showing when
-it was unlocked and how, **battery** and **signal** sensors, and a **firmware**
+it was activated and how, **battery** and **signal** sensors, and a **firmware**
 update entity. With Bluetooth, you can also choose how each lock is unlocked:
 through its Bold Connect or over Bluetooth, with the other as a fallback. Each
 Bold Connect gets a **connectivity** sensor and a **firmware** update entity.

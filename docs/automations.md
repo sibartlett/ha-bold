@@ -5,8 +5,8 @@
 - Unlock the door from a dashboard, a voice assistant or an automation, e.g.
   for a delivery or a guest.
 - Get notified about failed PIN attempts or tamper alerts.
-- Know when someone unlocks the door, and whether they used the app, a PIN or
-  the button.
+- Know when someone activates the lock, and whether they used the app, a PIN
+  or the button.
 - Get warned when a lock's batteries run low or the Bold Connect goes offline,
   before remote unlocking stops working.
 
@@ -59,11 +59,11 @@ actions:
         using {{ trigger.to_state.attributes.method }}
 ```
 
-Notify when the door is unlocked remotely, through a Bold Connect, rather
+Notify when the lock is activated remotely, through a Bold Connect, rather
 than by someone at the door (`remote`), and say from which app (`client`):
 
 ```yaml
-alias: Front door unlocked remotely
+alias: Front door activated remotely
 triggers:
   - trigger: state
     entity_id: event.front_door_activity
@@ -81,8 +81,8 @@ actions:
   - action: notify.notify
     data:
       message: >
-        {{ trigger.to_state.attributes.user or "Someone" }} unlocked the front
-        door remotely, from {{ trigger.to_state.attributes.client or "an app" }}.
+        {{ trigger.to_state.attributes.user or "Someone" }} activated the front
+        door lock remotely, from {{ trigger.to_state.attributes.client or "an app" }}.
 ```
 
 Turn the hallway light on when someone arrives home, and the Bold app
