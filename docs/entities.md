@@ -55,7 +55,7 @@ Each activity has an `event_type`: `activated`, `activation_failed`,
 | Attribute | On | What it tells you |
 |---|---|---|
 | `time` | Everything | When it happened, by the device's clock, but never later than it reached Home Assistant. |
-| `user` | Everything | Who did it, when Bold knows, such as for activations from the Bold app or Home Assistant. Activations by the button or a PIN haven't been seen to name anyone. |
+| `user` | Everything | Who did it, when Bold knows, such as the person using the Bold app. Activations from Home Assistant name the Bold account it signed in with, not the person in Home Assistant. Activations by the button or a PIN haven't been seen to name anyone. |
 | `method` | Activations and deactivations | How, such as `Pin`, `Button` or `Ble` (Bluetooth, from the app, Home Assistant or a Bold Connect). |
 | `remote` | Activations and deactivations | Whether it went through a Bold Connect, rather than being done nearby. |
 | `client` | Activations and deactivations | The app that sent it, such as `BoldApp` or `HomeAssistant`, or none for the lock's button or keypad. |
