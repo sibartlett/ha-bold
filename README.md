@@ -6,17 +6,17 @@
 
 Bring your [Bold Smart Locks](https://boldsmartlock.com) into Home Assistant.
 Unlock your doors from a dashboard, an automation or your voice assistant, see
-who came and went, and get a heads-up before a battery runs out.
+when and how they're unlocked, and get a heads-up before a battery runs out.
 
 ## What you can do
 
 - **Unlock from anywhere**, through a Bold Connect, or **directly over
   Bluetooth** when Home Assistant is in range, through its own adapter or an
   [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html)
-  near the door. Bluetooth is faster and keeps working when the internet is
-  down.
-- **See who opened the door, and how**: the app, a PIN, the button or a key
-  fob, usually within seconds.
+  near the door. Bluetooth is faster, and keeps working if the internet goes
+  down while Home Assistant is running.
+- **See when your doors are unlocked, and how**: from the app, a PIN or the
+  button, usually within seconds, and by whom when it's the app.
 - **Know whether a door is locked**, with a Bold Elite or an upgraded Bold
   Classic.
 - **Get alerts** for wrong PINs, tamper warnings, low batteries, or a Bold
@@ -29,7 +29,7 @@ who came and went, and get a heads-up before a battery runs out.
 |---|---|
 | Bold Smart Cylinder | ✅ Tested with the Bold Classic, with and without the Classic Upgrade. The Bold Elite should work too, but hasn't been tested. |
 | Bold Connect | ✅ Unlocks your locks remotely. With its **Controller** setting on, it can also open a door, gate or garage door wired to it. |
-| Bold Clicker (key fob) | ➖ Not added as a device, but whenever it opens a lock, that shows in the lock's activity. |
+| Bold Clicker (key fob) | ➖ Not added as a device. Its activations should show in the lock's activity, but this hasn't been confirmed yet. |
 
 ## Getting started
 
@@ -78,8 +78,8 @@ dashboards afterwards.
 
 ## What you get
 
-Each lock gets a **lock** to unlock it, an **activity** event showing who
-opened it and how, **battery** and **signal** sensors, and a **firmware**
+Each lock gets a **lock** to unlock it, an **activity** event showing when
+it was unlocked and how, **battery** and **signal** sensors, and a **firmware**
 update entity. With Bluetooth, you can also choose how each lock is unlocked:
 through its Bold Connect or over Bluetooth, with the other as a fallback. Each
 Bold Connect gets a **connectivity** sensor and a **firmware** update entity.
