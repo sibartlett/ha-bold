@@ -1,6 +1,6 @@
 # Bold Smart Lock for Home Assistant
 
-[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
+[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/sibartlett/ha-bold)](https://github.com/sibartlett/ha-bold/releases)
 [![Tests](https://github.com/sibartlett/ha-bold/actions/workflows/tests.yml/badge.svg)](https://github.com/sibartlett/ha-bold/actions/workflows/tests.yml)
 
@@ -35,12 +35,10 @@ when and how they're used, and get a heads-up before a battery runs out.
 
 You'll need Home Assistant 2026.8 or later.
 
-1. Open the repository in HACS, and download **Bold Smart Lock**:
+1. Search for **Bold Smart Lock** in HACS and download it, or open it in
+   HACS directly:
 
    [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=sibartlett&repository=ha-bold&category=integration)
-
-   Or, in HACS, add `https://github.com/sibartlett/ha-bold` as a custom
-   repository (type: Integration).
 2. Restart Home Assistant.
 3. Add the integration, and sign in with your Bold account:
 
