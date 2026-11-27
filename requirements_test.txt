@@ -4,4 +4,4 @@
 pytest-homeassistant-custom-component==0.13.375
 ruff==0.17.5
 mypy==2.4.1
-hypothesis==6.170.15
+hypothesis==6.170.17
