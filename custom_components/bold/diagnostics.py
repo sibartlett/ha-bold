@@ -73,6 +73,7 @@ async def async_get_config_entry_diagnostics(
             for lock, door_sensor in data.door_sensors.items()
         },
         "devices": _redact([device.raw for device in data.devices.data.values()]),
+        "shared_devices": sorted(data.devices.shared_ids),
         "event_log_devices": data.events.device_ids,
         "recent_events": _redact([event.raw for event in data.events.recent_events]),
         "bluetooth": _bluetooth(data),

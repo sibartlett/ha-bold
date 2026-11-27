@@ -1,6 +1,6 @@
 """Bold devices and events, as the Bold API returns them."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 import re
@@ -8,11 +8,13 @@ from typing import Any
 
 from .payloads import (
     DevicePayload,
+    DevicePermissionPayload,
     DeviceTypePayload,
     EventPayload,
     FeaturesPayload,
     GatewayPayload,
     ModelPayload,
+    PermissionsPayload,
     PersonPayload,
     ReadingsPayload,
     ReferencePayload,
@@ -238,6 +240,21 @@ class BoldDevice:
             gateway_last_seen=parse_datetime(gateway.get("lastSeen")),
             raw=data,
         )
+
+    @classmethod
+    def from_permission(cls, data: DevicePermissionPayload) -> BoldDevice | None:
+        """Create a device the account may use, if it may activate it remotely.
+
+        Without being its administrator, the account can't read its event log:
+        Bold refuses any request for events that includes it.
+        """
+        permissions: PermissionsPayload = _dict(data.get("permissions"))
+        if not _flag(permissions.get("remoteActivate")):
+            return None
+        device = cls.from_api(_dict(data.get("device")))
+        if device is None or _flag(permissions.get("administrate")):
+            return device
+        return replace(device, event_log=False)
 
     @property
     def is_lock(self) -> bool:

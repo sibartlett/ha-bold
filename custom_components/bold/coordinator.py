@@ -86,7 +86,7 @@ def _update_error(err: BoldError) -> ConfigEntryAuthFailed | UpdateFailed:
 
 
 class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):
-    """Polls the devices of a Bold account."""
+    """Polls the devices of a Bold account, and those shared with it."""
 
     config_entry: BoldConfigEntry
 
@@ -104,6 +104,9 @@ class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):
         self.client = client
         # Bold Connect device ID -> device registry ID, for linking locks.
         self.connect_device_ids: dict[int | None, str] = {}
+        # Devices the account may only use; None until they've been fetched.
+        self._permitted: dict[int, BoldDevice] | None = None
+        self.shared_ids: set[int] = set()
 
     async def _async_update_data(self) -> dict[int, BoldDevice]:
         """Fetch all devices."""
@@ -111,7 +114,26 @@ class BoldDeviceCoordinator(DataUpdateCoordinator[dict[int, BoldDevice]]):
             devices = await self.client.get_devices()
         except BoldError as err:
             raise _update_error(err) from err
-        return {device.id: device for device in devices}
+        own = {device.id: device for device in devices}
+        # Bold doesn't document this request, so the account's own devices
+        # mustn't depend on it: if it fails, shared devices stay as they were.
+        try:
+            permitted = await self.client.get_permitted_devices()
+        except BoldError as err:
+            _LOGGER.debug("Couldn't fetch the devices shared with the account: %s", err)
+        else:
+            self._permitted = {device.id: device for device in permitted}
+        data = {**(self._permitted or {}), **own}
+        self.shared_ids = data.keys() - own.keys()
+        _LOGGER.debug(
+            "Bold devices: own %s, shared %s", sorted(own), sorted(self.shared_ids)
+        )
+        return data
+
+    @property
+    def shared_known(self) -> bool:
+        """Return whether the devices shared with the account are known."""
+        return self._permitted is not None
 
 
 class BoldEventCoordinator(DataUpdateCoordinator[list[BoldEvent]]):

@@ -109,6 +109,55 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Enable loading custom_components."""
 
 
+def permission(device: dict[str, Any], **permissions: bool) -> dict[str, Any]:
+    """Return a device as GET /v2/effective-device-permissions returns it."""
+    return {
+        "id": 9000,
+        "permissions": {
+            "administrate": False,
+            "remoteActivate": True,
+            **permissions,
+        },
+        "device": device,
+    }
+
+
+def set_permissions(
+    aioclient_mock: AiohttpClientMocker,
+    permissions: list[dict[str, Any]] | None = None,
+    status: int = 200,
+) -> None:
+    """Replace the mocked /v2/effective-device-permissions response."""
+    aioclient_mock._mocks = [  # noqa: SLF001
+        mock
+        for mock in aioclient_mock._mocks  # noqa: SLF001
+        if "/v2/effective-device-permissions" not in str(mock.url)
+    ]
+    aioclient_mock.get(
+        f"{API_URL}/v2/effective-device-permissions",
+        json=permissions or [],
+        status=status,
+    )
+
+
+@pytest.fixture(autouse=True)
+def no_shared_devices(
+    aioclient_mock: AiohttpClientMocker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Share no devices with the account, unless a test does.
+
+    Also after a test clears the mocked requests to replace others.
+    """
+    clear_requests = aioclient_mock.clear_requests
+
+    def clear() -> None:
+        clear_requests()
+        set_permissions(aioclient_mock)
+
+    monkeypatch.setattr(aioclient_mock, "clear_requests", clear)
+    set_permissions(aioclient_mock)
+
+
 @pytest.fixture
 def devices() -> list[dict[str, Any]]:
     """Return the devices the mocked API returns."""

@@ -210,27 +210,39 @@ class BoldBluetoothKeys:
         """Load stored keys."""
         self._keys.update(decode_keys(await self._store.async_load()))
 
-    async def async_refresh(self, device_ids: list[int]) -> None:
-        """Fetch fresh keys for locks from Bold's cloud, keeping old ones on errors."""
-        if not device_ids:
+    async def async_refresh(self, *groups: list[int]) -> None:
+        """Fetch fresh keys for locks from Bold's cloud, keeping old ones on errors.
+
+        Each group of locks is fetched separately: one failing doesn't affect
+        the others.
+        """
+        if not (requested := [group for group in groups if group]):
             return
-        try:
-            handshakes = await self._client.get_bluetooth_handshakes(device_ids)
-            commands = await self._client.get_bluetooth_commands(
-                device_ids, [COMMAND_ACTIVATE, COMMAND_DEACTIVATE]
-            )
-        except BoldError as err:
+        fetched: dict[int, BoldLockKeys] = {}
+        errors: list[BoldError] = []
+        for device_ids in requested:
+            try:
+                handshakes = await self._client.get_bluetooth_handshakes(device_ids)
+                commands = await self._client.get_bluetooth_commands(
+                    device_ids, [COMMAND_ACTIVATE, COMMAND_DEACTIVATE]
+                )
+            except BoldError as err:
+                errors.append(err)
+            else:
+                fetched.update(parse_keys(handshakes, commands))
+        for error in errors:
             level = logging.DEBUG if self._failing else logging.WARNING
             self._failing = True
             _LOGGER.log(
-                level, "Couldn't refresh the Bluetooth keys of Bold locks: %s", err
+                level, "Couldn't refresh the Bluetooth keys of Bold locks: %s", error
             )
-            return
-        if self._failing:
+        if self._failing and not errors:
             _LOGGER.info("Refreshed the Bluetooth keys of Bold locks again")
-        self._failing = False
+            self._failing = False
+        if len(errors) == len(requested):
+            return
 
-        self._keys.update(parse_keys(handshakes, commands))
+        self._keys.update(fetched)
         await self._store.async_save(encode_keys(self._keys))
         for listener in list(self._listeners):
             listener()

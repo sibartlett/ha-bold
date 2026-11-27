@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Devices shared with you
+
+Locks and Bold Connects shared with your Bold account now appear, if the share
+allows remote activation. Before, only devices you administer did
+([#58](https://github.com/sibartlett/ha-bold/issues/58)). Bold keeps their
+activity to their administrators, so they have no activity entity, and only
+show activations made from Home Assistant.
+
 ## 1.2.2 (2026-10-24)
 
 ### Battery levels match what Bold sends

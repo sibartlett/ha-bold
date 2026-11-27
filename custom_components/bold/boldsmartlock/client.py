@@ -90,7 +90,7 @@ class BoldClient:
         return account
 
     async def get_devices(self) -> list[BoldDevice]:
-        """Return all devices the account has access to."""
+        """Return all devices the account manages."""
         devices: list[BoldDevice] = []
         offset = 0
         while True:
@@ -107,6 +107,18 @@ class BoldClient:
             if len(page) < PAGE_SIZE:
                 return devices
             offset += PAGE_SIZE
+
+    async def get_permitted_devices(self) -> list[BoldDevice]:
+        """Return the devices the account may activate, including shared ones.
+
+        Devices shared with the account are left out of get_devices() if it
+        doesn't administer them. Not part of Bold's public API.
+        """
+        return [
+            device
+            for item in await self._get_list("/v2/effective-device-permissions", {})
+            if (device := BoldDevice.from_permission(item))
+        ]
 
     async def get_events(
         self,

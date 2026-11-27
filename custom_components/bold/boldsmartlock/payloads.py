@@ -95,6 +95,24 @@ class DevicePayload(TypedDict, total=False):
     lastLocked: str
 
 
+class PermissionsPayload(TypedDict, total=False):
+    """What the account may do with a device."""
+
+    administrate: bool
+    remoteActivate: bool
+
+
+class DevicePermissionPayload(TypedDict, total=False):
+    """A device the account may use, from GET /v2/effective-device-permissions.
+
+    Its own ID is the permission's, not the device's.
+    """
+
+    id: int
+    device: DevicePayload
+    permissions: PermissionsPayload
+
+
 class ReadingsPayload(TypedDict, total=False):
     """Readings a lock reports: in a status event, or a debug event's body."""
 

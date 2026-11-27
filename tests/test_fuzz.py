@@ -128,6 +128,25 @@ JSON: st.SearchStrategy[Any] = st.recursive(
 PAYLOADS = st.dictionaries(st.sampled_from(KEYS) | st.text(max_size=5), JSON)
 
 
+@given(
+    PAYLOADS
+    | st.fixed_dictionaries(
+        {
+            "device": st.fixed_dictionaries({"id": st.integers()}) | PAYLOADS,
+            "permissions": st.fixed_dictionaries(
+                {"remoteActivate": st.booleans(), "administrate": st.booleans()}
+            )
+            | JSON,
+        }
+    )
+)
+def test_permission_from_any_payload(payload: dict[str, Any]) -> None:
+    """Test any permission payload is parsed or rejected, without raising."""
+    device = BoldDevice.from_permission(payload)
+    if device is not None:
+        assert isinstance(device.id, int)
+
+
 @given(PAYLOADS)
 def test_event_from_any_payload(payload: dict[str, Any]) -> None:
     """Test any event payload is parsed or rejected, without raising."""

@@ -31,7 +31,12 @@ problem returns after being fixed.
   back to the Bold Connect.
 - **Unlocking fails with "Too many requests".** Bold limits how often locks can
   be activated. Wait a moment and try again.
-- **A lock has no activity entity.** The lock doesn't support Bold's event log.
+- **A lock has no activity entity.** The lock doesn't support Bold's event log,
+  or it's shared with you and you don't administer it.
+- **A shared lock or Bold Connect is missing.** The share has to allow remote
+  activation. A shared Connect needs its
+  [Controller setting](controller.md) on to be activated, and its lock and
+  button are disabled by default.
 - **A lock's activity never changes.** If the log says the account "is not
   allowed to read the event log", your Bold account doesn't have access to it,
   so activity isn't tracked.

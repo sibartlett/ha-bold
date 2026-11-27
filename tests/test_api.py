@@ -28,7 +28,14 @@ from custom_components.bold.boldsmartlock import (
 from custom_components.bold.boldsmartlock.client import PAGE_SIZE
 from custom_components.bold.boldsmartlock.const import API_URL
 
-from .conftest import GATEWAY_ID, LOCK, LOCK_ID, event_payload
+from .conftest import (
+    GATEWAY_ID,
+    LOCK,
+    LOCK_ID,
+    event_payload,
+    permission,
+    set_permissions,
+)
 
 
 def test_parse_duration_is_fast() -> None:
@@ -466,6 +473,30 @@ async def test_unexpected_responses(
     getattr(aioclient_mock, method)(f"{API_URL}{path}", json="unexpected")
     with pytest.raises(BoldError, match="Unexpected response"):
         await call(_client(hass))
+
+
+async def test_get_permitted_devices(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test devices the account may activate are returned, by their own ID."""
+    device = {**LOCK, "id": 5}
+    set_permissions(
+        aioclient_mock,
+        [
+            permission(device),
+            permission({**device, "id": 6}, administrate=True),
+            permission({**device, "id": 7}, remoteActivate=False),
+            permission({"name": "No ID"}),
+            {"id": 8, "device": {**device, "id": 8}},
+            {"permissions": "junk", "device": "junk"},
+        ],
+    )
+    shared, administrated = await _client(hass).get_permitted_devices()
+    assert (shared.id, administrated.id) == (5, 6)
+    assert shared.remote_access
+    # Only an administrator may read its event log.
+    assert not shared.event_log
+    assert administrated.event_log
 
 
 async def test_get_events_paginates(

@@ -120,10 +120,14 @@ def _async_setup_bluetooth(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
 
     @callback
     def refresh_keys(*_: Any) -> None:
+        locks = [device.id for device in data.devices.data.values() if device.is_lock]
         entry.async_create_background_task(
             hass,
+            # Separately, so a shared lock Bold refuses keys for doesn't keep
+            # the account's own locks from getting theirs.
             data.bluetooth_keys.async_refresh(
-                [device.id for device in data.devices.data.values() if device.is_lock]
+                [lock for lock in locks if lock not in data.devices.shared_ids],
+                [lock for lock in locks if lock in data.devices.shared_ids],
             ),
             "Refresh Bold Bluetooth keys",
         )
@@ -170,6 +174,9 @@ def _async_sync_devices(hass: HomeAssistant, entry: BoldConfigEntry) -> None:
         device_id = _bold_device_id(device_entry)
         bold_device = devices.data.get(device_id) if device_id is not None else None
         if bold_device is None:
+            if not devices.shared_known:
+                # It may be a shared device that couldn't be fetched.
+                continue
             devices.connect_device_ids.pop(device_id, None)
             device_registry.async_update_device(
                 device_entry.id, remove_config_entry_id=entry.entry_id
